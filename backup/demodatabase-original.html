@@ -347,6 +347,57 @@
             margin-top: 8px;
             object-fit: contain;
         }
+
+        .toolbar, .filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .toolbar {
+            background: var(--surface);
+            padding: 14px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            background: var(--surface);
+            padding: 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 24px;
+        }
+
+        .filters .filter-wide { grid-column: span 2; }
+        .filters label { font-size: .75rem; color: var(--text-muted); font-weight: 600; }
+        .filters input, .filters select { padding: 9px; font-size: .85rem; }
+
+        .duplicate-warning {
+            display: none;
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #f59e0b;
+            border-radius: var(--radius);
+            padding: 10px 12px;
+            margin-bottom: 14px;
+            font-size: .9rem;
+        }
+
+        .draft-note {
+            color: var(--text-muted);
+            font-size: .8rem;
+            margin-right: auto;
+        }
+
+        @media (max-width: 600px) {
+            .filters .filter-wide { grid-column: span 1; }
+            header { align-items: flex-start; gap: 10px; flex-direction: column; }
+        }
     </style>
 </head>
 <body>
@@ -375,6 +426,20 @@
                 <h3>Top Barangays</h3>
                 <div class="number" id="stat-top-brgy" style="font-size:1.2rem;">-</div>
             </div>
+            <div class="card"><h3>Male</h3><div class="number" id="stat-male">0</div></div>
+            <div class="card"><h3>Female</h3><div class="number" id="stat-female">0</div></div>
+            <div class="card"><h3>Senior</h3><div class="number" id="stat-senior">0</div></div>
+            <div class="card"><h3>Medical Cases</h3><div class="number" id="stat-medical">0</div></div>
+        </div>
+
+        <div class="toolbar">
+            <button class="btn btn-secondary" onclick="exportCSV()">Export CSV</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('csvImportInput').click()">Import CSV</button>
+            <input type="file" id="csvImportInput" accept=".csv,text/csv" hidden onchange="importCSV(event)">
+            <button class="btn btn-secondary" onclick="backupJSON()">Backup JSON</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('jsonRestoreInput').click()">Restore JSON</button>
+            <input type="file" id="jsonRestoreInput" accept=".json,application/json" hidden onchange="restoreJSON(event)">
+            <span class="draft-note" id="draftStatus">No saved draft</span>
         </div>
 
         <!-- Scan Document / ID Section -->
@@ -429,6 +494,20 @@
             <input type="text" id="searchInput" class="search-input" placeholder="🔍 Search documents and records by name, birthday, address, brgy, diagnosis, or remarks..." onkeyup="filterRecords()">
         </div>
 
+        <div class="filters">
+            <div><label>Sex</label><select id="filterSex" onchange="filterRecords()"><option value="">All</option><option>Male</option><option>Female</option></select></div>
+            <div><label>Barangay</label><select id="filterBrgy" onchange="filterRecords()"><option value="">All</option></select></div>
+            <div><label>Category</label><select id="filterCategory" onchange="filterRecords()"><option value="">All</option></select></div>
+            <div><label>Assistance Type</label><select id="filterAssistance" onchange="filterRecords()"><option value="">All</option></select></div>
+            <div><label>Employment</label><select id="filterEmployment" onchange="filterRecords()"><option value="">All</option></select></div>
+            <div class="filter-wide"><label>Diagnosis contains</label><input id="filterDiagnosis" type="text" placeholder="e.g. hypertension" oninput="filterRecords()"></div>
+            <div><label>Minimum Income</label><input id="filterIncomeMin" type="number" min="0" placeholder="₱0" oninput="filterRecords()"></div>
+            <div><label>Maximum Income</label><input id="filterIncomeMax" type="number" min="0" placeholder="Any" oninput="filterRecords()"></div>
+            <div><label>Minimum Grant</label><input id="filterAmountMin" type="number" min="0" placeholder="₱0" oninput="filterRecords()"></div>
+            <div><label>Maximum Grant</label><input id="filterAmountMax" type="number" min="0" placeholder="Any" oninput="filterRecords()"></div>
+            <div><label>&nbsp;</label><button class="btn btn-secondary" type="button" onclick="clearFilters()">Clear Filters</button></div>
+        </div>
+
         <!-- Main Records Table -->
         <div class="table-container">
             <table>
@@ -454,10 +533,11 @@
     <div class="modal" id="entryModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>New Assistance Record</h2>
+                <h2 id="entryModalTitle">New Assistance Record</h2>
                 <button style="background:none; border:none; font-size:1.5rem; cursor:pointer;" onclick="closeModal()">&times;</button>
             </div>
             <form id="assistanceForm" onsubmit="saveRecord(event)">
+                <div id="duplicateWarning" class="duplicate-warning"></div>
                 <div class="form-grid">
                     
                     <!-- 1. Name -->
@@ -662,8 +742,10 @@
                 </div>
 
                 <div class="modal-footer">
+                    <span class="draft-note" id="modalDraftStatus"></span>
                     <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                    <button type="submit" class="btn">Save Record</button>
+                    <button type="button" class="btn btn-secondary" onclick="saveDraft()">Save Draft</button>
+                    <button type="submit" class="btn" id="saveRecordButton">Save Record</button>
                 </div>
             </form>
         </div>
