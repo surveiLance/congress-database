@@ -1,9 +1,11 @@
 node_modules/
 .next/
+.open-next/
 out/
 dist/
 .vinext/
 .wrangler/
+.dev.vars*
 .DS_Store
 *.log
 *.tsbuildinfo

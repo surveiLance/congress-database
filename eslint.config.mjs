@@ -1,19 +1,24 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import { FlatCompat } from "@eslint/eslintrc";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const config = defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  globalIgnores([
-    ".next/**",
-    ".wrangler/**",
-    "dist/**",
-    "out/**",
-    "build/**",
-    "backup/**",
-    "next-env.d.ts",
-  ]),
-]);
+const filename = fileURLToPath(import.meta.url);
+const directory = path.dirname(filename);
+const compat = new FlatCompat({ baseDirectory: directory });
+
+const config = [
+  {
+    ignores: [
+      ".next/**",
+      ".vinext/**",
+      ".wrangler/**",
+      "dist/**",
+      "node_modules/**",
+      "backup/**",
+      "next-env.d.ts",
+    ],
+  },
+  ...compat.extends("next/core-web-vitals", "next/typescript"),
+];
 
 export default config;

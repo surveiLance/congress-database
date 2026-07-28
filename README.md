@@ -54,6 +54,26 @@ npm run build
 npm start
 ```
 
+## Cloudflare deployment
+
+The application is configured for Cloudflare Workers through the OpenNext adapter.
+The regular `npm run dev` workflow remains unchanged.
+
+Preview the Cloudflare Worker locally:
+
+```bash
+npm run preview:cloudflare
+```
+
+Deploy the current version:
+
+```bash
+npm run deploy:cloudflare
+```
+
+The current deployment is available at
+[assistance-program-system.antipolo-first-district.workers.dev](https://assistance-program-system.antipolo-first-district.workers.dev).
+
 ## Code quality checks
 
 ```bash
