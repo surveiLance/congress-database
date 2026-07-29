@@ -5,6 +5,7 @@ import AdvancedFilters, { defaultRecordFilters, RecordFilters } from "@/componen
 import ConditionMigration from "@/components/ConditionMigration";
 import Dashboard from "@/components/Dashboard";
 import DataTransfer from "@/components/DataTransfer";
+import DistrictLogo from "@/components/DistrictLogo";
 import DocumentScanner from "@/components/DocumentScanner";
 import LocalRecordsMigration from "@/components/LocalRecordsMigration";
 import RecordFormModal from "@/components/RecordFormModal";
@@ -177,7 +178,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     <main className="app-shell">
       <header className="app-header">
         <div className="district-brand">
-          <div className="district-mark" aria-hidden="true"><span>1ST</span></div>
+          <DistrictLogo priority />
           <div>
             <p className="district-kicker">Antipolo City · First District</p>
             <h1>Assistance Program System</h1>

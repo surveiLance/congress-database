@@ -26,8 +26,7 @@ body {
 .app-shell { max-width: 1380px; min-height: 100vh; margin: auto; padding: 18px 22px 32px; }
 .app-header { display: flex; justify-content: space-between; align-items: center; gap: 24px; min-height: 82px; padding: 10px 4px 18px; }
 .district-brand { display: flex; align-items: center; gap: 14px; }
-.district-mark { display: grid; width: 58px; height: 58px; place-items: center; border: 4px solid white; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 2px var(--primary), 0 4px 14px #075f3026; color: white; font-weight: 900; letter-spacing: -.04em; }
-.district-mark span { font-size: .95rem; }
+.district-logo { display: block; width: 64px; height: 64px; flex: 0 0 auto; border: 2px solid #d7eadf; border-radius: 50%; background: white; box-shadow: 0 4px 14px #075f3026; object-fit: cover; }
 .district-kicker { color: var(--primary); font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .district-subtitle { color: var(--muted); font-size: .8rem; font-weight: 600; }
 h1 { color: #063f24; font-size: clamp(1.25rem, 2vw, 1.65rem); line-height: 1.2; letter-spacing: -.02em; }
@@ -395,7 +394,7 @@ textarea { resize: vertical; }
 @media (max-width: 520px) {
   .app-shell { padding: 10px; }
   .app-header { align-items: stretch; flex-direction: column; gap: 10px; padding: 4px 2px 12px; }
-  .district-mark { width: 48px; height: 48px; }
+  .district-logo { width: 52px; height: 52px; }
   .header-actions { display: grid; grid-template-columns: 1fr auto; justify-content: stretch; }
   .shared-status { justify-content: center; }
   .header-action { grid-column: 1 / -1; justify-content: center; }

@@ -2,6 +2,7 @@
 
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Session } from "@supabase/supabase-js";
+import DistrictLogo from "@/components/DistrictLogo";
 import { getSupabaseClient, isSupabaseConfigured, isSupabaseTestMode } from "@/lib/supabase";
 
 interface Props {
@@ -73,7 +74,7 @@ export default function StaffAuthGate({ children }: Props) {
     return (
       <main className="access-page">
         <div className="access-card loading-card">
-          <div className="district-mark" aria-hidden="true"><span>1ST</span></div>
+          <DistrictLogo priority />
           <p>Connecting to the district database…</p>
         </div>
       </main>
@@ -85,7 +86,7 @@ export default function StaffAuthGate({ children }: Props) {
       <main className="access-page">
         <section className="access-card" aria-labelledby="test-access-title">
           <div className="access-brand">
-            <div className="district-mark" aria-hidden="true"><span>1ST</span></div>
+            <DistrictLogo priority />
             <div>
               <p className="district-kicker">Antipolo City · First District</p>
               <h1 id="test-access-title">Shared Test Database</h1>
@@ -108,7 +109,7 @@ export default function StaffAuthGate({ children }: Props) {
       <main className="access-page">
         <section className="access-card" aria-labelledby="staff-access-title">
           <div className="access-brand">
-            <div className="district-mark" aria-hidden="true"><span>1ST</span></div>
+            <DistrictLogo priority />
             <div>
               <p className="district-kicker">Antipolo City · First District</p>
               <h1 id="staff-access-title">Staff Access</h1>
