@@ -180,6 +180,17 @@ h1 { color: #063f24; font-size: clamp(1.25rem, 2vw, 1.65rem); line-height: 1.2; 
 .history-fill-button { background: #1d4ed8; white-space: nowrap; }
 .history-fill-button:hover { background: #1e40af; }
 .applicant-history-actions small { max-width: 230px; color: #166534; font-size: .7rem; text-align: right; }
+.applicant-choice-alert { grid-column: 1 / -1; display: grid; gap: 10px; margin-bottom: 4px; padding: 14px 16px; border: 2px solid #60a5fa; border-radius: var(--radius); background: #eff6ff; color: #1e3a8a; }
+.applicant-choice-alert > div:first-child { display: grid; gap: 2px; }
+.applicant-choice-alert .eyebrow { color: #1d4ed8; }
+.applicant-choice-alert p { color: #475569; font-size: .78rem; }
+.applicant-choice-list { display: grid; gap: 7px; }
+.applicant-choice { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 9px 10px; border: 1px solid #93c5fd; border-radius: 8px; background: white; color: var(--text); cursor: pointer; font: inherit; text-align: left; }
+.applicant-choice:hover { border-color: #2563eb; background: #f8fbff; box-shadow: 0 2px 8px #1d4ed81a; }
+.applicant-choice > span { display: grid; }
+.applicant-choice small { color: var(--muted); font-size: .7rem; }
+.applicant-choice > span:nth-child(2) { justify-items: end; color: #1d4ed8; }
+.applicant-choice-use { display: grid !important; min-width: 48px; min-height: 32px; place-items: center; border-radius: 7px; background: #1d4ed8; color: white; font-size: .75rem; font-weight: 800; }
 .scanner-card { margin-bottom: 16px; padding: 20px; border: 2px dashed #57ad77; border-radius: var(--radius); background: var(--surface); }
 .scanner-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .scanner-header span { color: var(--primary); font-weight: 600; }
@@ -359,6 +370,9 @@ textarea { resize: vertical; }
   .applicant-history-actions { width: 100%; justify-items: stretch; }
   .applicant-history-actions .btn { justify-content: center; }
   .applicant-history-actions small { max-width: none; text-align: left; }
+  .applicant-choice { grid-template-columns: minmax(0, 1fr) auto; }
+  .applicant-choice > span:nth-child(2) { justify-items: start; }
+  .applicant-choice-use { grid-column: 2; grid-row: 1 / span 2; }
   .applicant-lifetime-summary { grid-template-columns: 1fr; }
   .match-outcome { grid-template-columns: 1fr; }
   .match-outcome-actions { justify-content: flex-start; }

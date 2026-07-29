@@ -2,7 +2,14 @@
 
 import Image from "next/image";
 import { ChangeEvent, FormEvent, useMemo, useState } from "react";
-import { applicantIdentityKey, formatPeso, standardizeApplicantText } from "@/lib/applicantIdentity";
+import {
+  ApplicantHistory,
+  applicantIdentityKey,
+  buildApplicantHistories,
+  formatPeso,
+  normalizeIdentityPart,
+  standardizeApplicantText,
+} from "@/lib/applicantIdentity";
 import { conditionCategories } from "@/lib/conditionCategories";
 import { AssistanceRecord, emptyRecord } from "@/lib/types";
 
@@ -39,26 +46,30 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
     birthday: form.birthday,
   });
 
-  const applicantHistory = useMemo(() => {
-    if (!currentApplicantKey) return null;
-    const applications = existingRecords
-      .filter((record) => applicantIdentityKey(record) === currentApplicantKey)
-      .sort((first, second) => (Date.parse(second.createdAt) || 0) - (Date.parse(first.createdAt) || 0));
-    const priorApplications = applications.filter((record) => record.id !== initialRecord?.id);
-    if (!priorApplications.length) return null;
-    return {
-      applications,
-      priorApplications,
-      totalGranted: applications.reduce((sum, record) => sum + record.amount, 0),
-      latest: priorApplications[0],
-    };
-  }, [currentApplicantKey, existingRecords, initialRecord?.id]);
+  const applicantHistories = useMemo(() => {
+    const surname = normalizeIdentityPart(form.surname);
+    const firstName = normalizeIdentityPart(form.firstName);
+    if (!surname || !firstName) return [];
+
+    return Array.from(buildApplicantHistories(existingRecords).values())
+      .filter((history) => {
+        const latest = history.latestApplication;
+        const sameName = normalizeIdentityPart(latest.surname) === surname &&
+          normalizeIdentityPart(latest.firstName) === firstName;
+        return sameName && (!currentApplicantKey || history.key === currentApplicantKey);
+      })
+      .map((history) => ({
+        ...history,
+        priorApplications: history.records.filter((record) => record.id !== initialRecord?.id),
+      }))
+      .filter((history) => history.priorApplications.length > 0)
+      .sort((first, second) => (Date.parse(second.latestApplicationDate) || 0) - (Date.parse(first.latestApplicationDate) || 0));
+  }, [currentApplicantKey, existingRecords, form.firstName, form.surname, initialRecord?.id]);
 
   if (!open) return null;
 
-  const useExistingApplicantDetails = () => {
-    if (!applicantHistory?.latest) return;
-    const existing = applicantHistory.latest;
+  const applyExistingApplicantDetails = (applicantHistory: ApplicantHistory) => {
+    const existing = applicantHistory.latestApplication;
     setForm((current) => ({
       ...current,
       surname: existing.surname,
@@ -84,7 +95,7 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
       conditionCategories: [...existing.conditionCategories],
       conditionOther: existing.conditionOther,
     }));
-    setCopiedApplicantKey(currentApplicantKey);
+    setCopiedApplicantKey(applicantHistory.key);
   };
 
   const update = <Key extends keyof AssistanceRecord>(key: Key, value: AssistanceRecord[Key]) => {
@@ -148,20 +159,20 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
         <form onSubmit={submit}>
           <div className="record-form-layout">
             <div className="record-form-fields">
-              {applicantHistory && (
+              {applicantHistories.length === 1 && (
                 <div className="applicant-history-alert" role="status">
                   <div>
                     <span className="eyebrow">Existing applicant found</span>
-                    <strong>{applicantHistory.priorApplications.length} previous application{applicantHistory.priorApplications.length === 1 ? "" : "s"}</strong>
+                    <strong>{applicantHistories[0].priorApplications.length} previous application{applicantHistories[0].priorApplications.length === 1 ? "" : "s"}</strong>
                     <p>
-                      Previously granted: <b>{formatPeso(applicantHistory.priorApplications.reduce((sum, record) => sum + record.amount, 0))}</b>
-                      {applicantHistory.latest?.createdAt ? ` · Latest application ${new Date(applicantHistory.latest.createdAt).toLocaleDateString()}` : ""}
+                      Previously granted: <b>{formatPeso(applicantHistories[0].priorApplications.reduce((sum, record) => sum + record.amount, 0))}</b>
+                      {applicantHistories[0].latestApplicationDate ? ` · Latest application ${new Date(applicantHistories[0].latestApplicationDate).toLocaleDateString()}` : ""}
                     </p>
                   </div>
                   <div className="applicant-history-actions">
-                    <span className="history-total">Current recorded total: {formatPeso(applicantHistory.totalGranted)}</span>
+                    <span className="history-total">Current recorded total: {formatPeso(applicantHistories[0].totalGranted)}</span>
                     {!initialRecord && (
-                      <button className="btn history-fill-button" type="button" onClick={useExistingApplicantDetails}>
+                      <button className="btn history-fill-button" type="button" onClick={() => applyExistingApplicantDetails(applicantHistories[0])}>
                         Reuse Previous Applicant Information
                       </button>
                     )}
@@ -171,7 +182,39 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                         Assistance and beneficiary details are kept separate for this application.
                       </small>
                     )}
-                    {copiedApplicantKey === currentApplicantKey && <small role="status">Previous information copied. Review any changes before saving.</small>}
+                    {copiedApplicantKey === applicantHistories[0].key && <small role="status">Previous information copied. Review any changes before saving.</small>}
+                  </div>
+                </div>
+              )}
+              {applicantHistories.length > 1 && !initialRecord && (
+                <div className="applicant-choice-alert" role="status">
+                  <div>
+                    <span className="eyebrow">Possible existing applicants</span>
+                    <strong>{applicantHistories.length} people have this name</strong>
+                    <p>Select the correct person using their birthday and barangay. Their previous information will fill the form.</p>
+                  </div>
+                  <div className="applicant-choice-list">
+                    {applicantHistories.map((history) => {
+                      const applicant = history.latestApplication;
+                      return (
+                        <button
+                          className="applicant-choice"
+                          type="button"
+                          key={history.key}
+                          onClick={() => applyExistingApplicantDetails(history)}
+                        >
+                          <span>
+                            <strong>{applicant.firstName} {applicant.middleName} {applicant.surname}</strong>
+                            <small>{formatApplicantBirthday(applicant.birthday)} · {applicant.brgy || "No barangay recorded"}</small>
+                          </span>
+                          <span>
+                            <b>{formatPeso(history.totalGranted)}</b>
+                            <small>{history.applicationCount} application{history.applicationCount === 1 ? "" : "s"}</small>
+                          </span>
+                          <span className="applicant-choice-use">Use</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -283,6 +326,11 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
 
 function selectInitialZero(event: React.FocusEvent<HTMLInputElement>) {
   if (event.currentTarget.value === "0") event.currentTarget.select();
+}
+
+function formatApplicantBirthday(value: string) {
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString("en-PH");
 }
 
 function Field({ label, full = false, children }: { label: string; full?: boolean; children: React.ReactNode }) {
