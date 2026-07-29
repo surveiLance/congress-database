@@ -285,10 +285,25 @@ function ReviewModal({
           <div><span>First-level date</span><strong>{formatDate(record.intakeDate)}</strong></div>
           <div><span>Requested</span><strong>{formatPeso(record.amountRequested)}</strong></div>
           <div><span>Previously granted</span><strong>{formatPeso(previousHistory?.totalGranted || 0)}</strong><small>{previousHistory?.applicationCount || 0} completed application{previousHistory?.applicationCount === 1 ? "" : "s"}</small></div>
-          <div className={approvedPacket ? "approved" : ""}>
-            <span>{approvedPacket ? "Approved amount" : "Grant decision"}</span>
-            <strong>{approvedPacket ? formatPeso(record.amount) : readOnly ? "Awaiting review" : "Enter below"}</strong>
-          </div>
+          {readOnly ? (
+            <div className={approvedPacket ? "approved" : ""}>
+              <span>{approvedPacket ? "Approved amount" : "Grant decision"}</span>
+              <strong>{approvedPacket ? formatPeso(record.amount) : "Awaiting review"}</strong>
+            </div>
+          ) : (
+            <label className="review-decision-card">
+              <span>Grant decision (₱) *</span>
+              <input
+                autoFocus
+                type="number"
+                min="0"
+                step=".01"
+                value={amount || ""}
+                onChange={(event) => setAmount(Number(event.target.value))}
+                placeholder="Enter approved amount"
+              />
+            </label>
+          )}
         </section>
         <div className="workflow-review-layout">
           <div className="review-information">
@@ -322,12 +337,6 @@ function ReviewModal({
               <span>Reviewer notes {readOnly ? "" : "/ reason for return"}</span>
               <textarea readOnly={readOnly} rows={4} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Record missing documents, corrections, or approval notes." />
             </label>
-            {!readOnly && (
-              <label className="review-amount">
-                <span>Approved amount (₱) *</span>
-                <input type="number" min="0" step=".01" value={amount || ""} onChange={(event) => setAmount(Number(event.target.value))} placeholder="0.00" />
-              </label>
-            )}
           </div>
           <aside className="review-documents">
             <div>
