@@ -181,7 +181,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
           <DistrictLogo priority />
           <div>
             <p className="district-kicker">Antipolo City · First District</p>
-            <h1>Assistance Program System</h1>
+            <h1>First District Assistance Management System</h1>
             <p className="district-subtitle">Congressional District Office</p>
           </div>
         </div>

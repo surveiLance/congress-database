@@ -1,4 +1,4 @@
-# Assistance Program System
+# First District Assistance Management System
 
 A Next.js App Router application for managing local assistance-program records. It preserves the original dashboard, applicant form, record details, search, deletion, statistics, ID attachment, OCR scanning, and scanned-document matching.
 
