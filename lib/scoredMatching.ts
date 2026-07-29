@@ -80,7 +80,7 @@ export function scoreDocumentMatches(rawText: string, records: AssistanceRecord[
     second.percentage - first.percentage ||
     second.matchedFields.length - first.matchedFields.length ||
     `${first.record.surname} ${first.record.firstName}`.localeCompare(`${second.record.surname} ${second.record.firstName}`),
-  ).slice(0, 5);
+  ).filter((match) => match.percentage > 0 && match.matchedFields.length > 0).slice(0, 5);
 }
 
 export function normalizeText(value: string) {

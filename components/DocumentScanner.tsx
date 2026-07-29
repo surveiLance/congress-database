@@ -50,6 +50,8 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
   };
 
   const confident = Boolean(matches?.length && matches[0].percentage >= confidentMatchThreshold);
+  const possible = Boolean(matches?.length);
+  const topMatch = matches?.[0] || null;
   const confirmedMatch = matches?.find((match) => match.record.id !== undefined && match.record.id === confirmedId) || null;
 
   const attachDocument = async () => {
@@ -68,26 +70,48 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
       <section className="scanner-card">
         <div className="scanner-header"><h3>Document / ID Matching</h3>{busy && <span>Reading document…</span>}</div>
         <div className="scanner-body">
-          <div>
+          <div className="scanner-upload">
             <label className="btn secondary file-button">Upload ID or Document<input type="file" accept="image/*" capture="environment" onChange={scan} /></label>
             {preview && <Image unoptimized src={preview} width={800} height={500} className="scan-preview" alt="Document preview" />}
           </div>
-          <div><label>Raw OCR Text for Staff Review:</label><div className="scan-output">{text}</div></div>
+          <div className="scanner-review">
+            <div className="scanner-result-heading">
+              <div>
+                <span className="eyebrow">Possible fields from the document</span>
+                <h4>{busy ? "Reading the document…" : topMatch ? "Compare these fields" : preview ? "No usable applicant fields detected" : "Upload an ID to begin"}</h4>
+              </div>
+              {topMatch && <span className={`match-percentage${confident ? "" : " low"}`}>{topMatch.percentage}% match</span>}
+            </div>
+            {topMatch ? (
+              <DetectedFields match={topMatch} />
+            ) : (
+              <div className="scanner-empty-summary">
+                <strong>{busy ? "OCR is checking the image." : preview ? "Try a clearer, straighter photo." : "Surname, first name, birthday, address, and barangay will appear here."}</strong>
+                <span>Staff must still confirm the correct applicant.</span>
+              </div>
+            )}
+            {preview && (
+              <details className="scanner-ocr-details">
+                <summary><span>Show OCR details</span><small>For troubleshooting only</small></summary>
+                <div className="scan-output">{text}</div>
+              </details>
+            )}
+          </div>
         </div>
       </section>
       {matches && (
         <section className="match-section">
           <div className="match-heading">
-            <div><h3>Scored Database Matches</h3><p>Review the top five candidates. No record is selected automatically.</p></div>
+            <div><h3>Possible Applicants</h3><p>Only applicants with at least one matching field are shown. Staff must confirm the correct person.</p></div>
             <span className={`match-status ${confident ? "confident" : "not-confident"}`}>
-              {confident ? "Possible Confident Match" : "No Confident Match"}
+              {confident ? "Strong Possible Match" : possible ? "Possible Match — Verify" : "No Match Found"}
             </span>
           </div>
           <div className="table-container">
             <table>
               <thead><tr><th>Rank</th><th>Applicant</th><th>Birthday</th><th>Barangay</th><th>Match</th><th>Matched Fields</th><th>Staff Action</th></tr></thead>
               <tbody>
-                {!matches.length && <tr><td colSpan={7} className="empty">No database records are available for comparison.</td></tr>}
+                {!matches.length && <tr><td colSpan={7} className="empty">No applicants matched the readable information. Try a clearer photo or search the records manually.</td></tr>}
                 {matches.map((match, index) => {
                   const { record } = match;
                   const isConfirmed = record.id !== undefined && confirmedId === record.id;
@@ -113,7 +137,7 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
                           disabled={record.id === undefined}
                           onClick={() => { setConfirmedId(record.id as number); setAttached(false); }}
                         >
-                          {isConfirmed ? "Selected ✓" : match.percentage < confidentMatchThreshold ? "Select Anyway" : "Select Match"}
+                          {isConfirmed ? "Confirmed ✓" : "Confirm This Applicant"}
                         </button>
                       </td>
                     </tr>
@@ -141,6 +165,29 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
         </section>
       )}
     </>
+  );
+}
+
+function DetectedFields({ match }: { match: ScoredRecordMatch }) {
+  const matched = (field: string) => match.matchedFields.some((item) => item.toLowerCase().startsWith(field.toLowerCase()));
+  const fields = [
+    ["Surname", matched("Surname") ? match.record.surname : ""],
+    ["First name", matched("First name") ? match.record.firstName : ""],
+    ["Birthday", matched("Birthday") ? match.record.birthday : ""],
+    ["Barangay", matched("Barangay") ? match.record.brgy : ""],
+    ["Address", matched("Address") ? match.record.address : ""],
+    ["ID number", matched("ID number") ? match.record.idNumber : ""],
+  ];
+  return (
+    <div className="detected-field-grid">
+      {fields.map(([label, value]) => (
+        <div className={value ? "detected" : "missing"} key={label}>
+          <span>{label}</span>
+          <strong>{value || "Not detected"}</strong>
+          <small>{value ? "Matched" : "Verify manually"}</small>
+        </div>
+      ))}
+    </div>
   );
 }
 
