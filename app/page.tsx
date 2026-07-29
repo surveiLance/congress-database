@@ -13,6 +13,7 @@ import RecordTable from "@/components/RecordTable";
 import StaffAuthGate from "@/components/StaffAuthGate";
 import ViewRecordModal from "@/components/ViewRecordModal";
 import { addRecord, deleteRecord, getRecords, subscribeToRecordChanges, updateRecord } from "@/lib/recordStore";
+import { applicantIdentityKey } from "@/lib/applicantIdentity";
 import { getSupabaseClient } from "@/lib/supabase";
 import { AssistanceRecord } from "@/lib/types";
 
@@ -93,7 +94,8 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     const matching = visibleRecords.filter((record) => {
       const searchable = normalizeSearchText(Object.values(record)
         .filter((value) => typeof value !== "string" || !value.startsWith("data:image/"))
-        .join(" "));
+        .join(" ") + " " + record.familyComposition.map((member) =>
+        `${member.fullName} ${member.relationship} ${member.birthday}`).join(" "));
       const fullName = normalizeSearchText(`${record.surname} ${record.firstName} ${record.middleName} ${record.suffix}`);
       const diagnosis = normalizeSearchText(record.diagnosis);
       const createdDate = record.createdAt ? record.createdAt.slice(0, 10) : "";
@@ -172,6 +174,21 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     await updateRecord({ ...record, idImage: imageData, updatedAt: new Date().toISOString() });
     await refresh();
     return true;
+  };
+
+  const saveHouseholdDecision = async (record: AssistanceRecord) => {
+    const identityKey = applicantIdentityKey(record);
+    const applicantRecords = identityKey
+      ? records.filter((application) => applicantIdentityKey(application) === identityKey)
+      : [record];
+    await Promise.all(applicantRecords.map((application) => updateRecord({
+      ...application,
+      confirmedRelativeKeys: [...record.confirmedRelativeKeys],
+      dismissedRelativeKeys: [...record.dismissedRelativeKeys],
+      updatedAt: record.updatedAt,
+    })));
+    setSelected(record);
+    await refresh();
   };
 
   return (
@@ -312,7 +329,13 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
           onSave={save}
         />
       )}
-      <ViewRecordModal record={selected} allRecords={records} onClose={() => setSelected(null)} />
+      <ViewRecordModal
+        record={selected}
+        allRecords={records}
+        onClose={() => setSelected(null)}
+        onView={setSelected}
+        onUpdate={saveHouseholdDecision}
+      />
     </main>
   );
 }

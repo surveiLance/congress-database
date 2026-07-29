@@ -1,5 +1,11 @@
 import { normalizeConditionCategories } from "./conditionCategories";
 
+export interface FamilyMember {
+  fullName: string;
+  relationship: string;
+  birthday: string;
+}
+
 export interface AssistanceRecord {
   id?: number;
   surname: string;
@@ -17,6 +23,9 @@ export interface AssistanceRecord {
   salary: number;
   employedStatus: string;
   householdMembers: number;
+  familyComposition: FamilyMember[];
+  confirmedRelativeKeys: string[];
+  dismissedRelativeKeys: string[];
   totalEmployed: number;
   monthlyExpenses: number;
   civilStatus: string;
@@ -45,7 +54,8 @@ export interface AssistanceRecord {
 export const emptyRecord: AssistanceRecord = {
   surname: "", firstName: "", middleName: "", suffix: "", birthday: "", age: "",
   sex: "", contact: "", idNumber: "", brgy: "", address: "", work: "", salary: 0,
-  employedStatus: "Employed", householdMembers: 0, totalEmployed: 0, monthlyExpenses: 0,
+  employedStatus: "Employed", householdMembers: 0, familyComposition: [],
+  confirmedRelativeKeys: [], dismissedRelativeKeys: [], totalEmployed: 0, monthlyExpenses: 0,
   civilStatus: "", category: "", assistanceType: "", amountRequested: 0, amount: 0, relationship: "",
   benName: "", benBday: "", benAge: "", benSex: "", benFamilyMember: "",
   benCivilStatus: "", benCategory: "", diagnosis: "", conditionCategories: [],
@@ -64,6 +74,9 @@ export function normalizeRecord(record: Partial<AssistanceRecord>): AssistanceRe
     amount: Number(record.amount) || 0,
     monthlyExpenses: Number(record.monthlyExpenses) || 0,
     householdMembers: Number(record.householdMembers) || 0,
+    familyComposition: normalizeFamilyComposition(record.familyComposition),
+    confirmedRelativeKeys: normalizeStringArray(record.confirmedRelativeKeys),
+    dismissedRelativeKeys: normalizeStringArray(record.dismissedRelativeKeys),
     totalEmployed: Number(record.totalEmployed) || 0,
     conditionCategories: normalizeConditionCategories(record.conditionCategories),
     conditionOther: record.conditionOther || "",
@@ -73,4 +86,36 @@ export function normalizeRecord(record: Partial<AssistanceRecord>): AssistanceRe
     updatedAt: record.updatedAt || record.createdAt || "",
     archivedAt: record.archivedAt || "",
   };
+}
+
+function normalizeFamilyComposition(value: unknown): FamilyMember[] {
+  const parsed = parsePossibleJson(value);
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .filter((member): member is Record<string, unknown> => Boolean(member && typeof member === "object" && !Array.isArray(member)))
+    .map((member) => ({
+      fullName: String(member.fullName || member.name || "").trim(),
+      relationship: String(member.relationship || member.relation || "").trim(),
+      birthday: String(member.birthday || member.birthdate || "").trim(),
+    }))
+    .filter((member) => Boolean(member.fullName));
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  const parsed = parsePossibleJson(value);
+  if (Array.isArray(parsed)) return Array.from(new Set(parsed.map(String).map((item) => item.trim()).filter(Boolean)));
+  if (typeof parsed === "string") return parsed.split(",").map((item) => item.trim()).filter(Boolean);
+  return [];
+}
+
+function parsePossibleJson(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return value;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return value;
+  }
 }

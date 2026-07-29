@@ -1,4 +1,5 @@
 import { applicantIdentityKey, buildApplicantHistories, formatPeso } from "@/lib/applicantIdentity";
+import { householdSummaryForRecord } from "@/lib/householdMatching";
 import { AssistanceRecord } from "@/lib/types";
 
 interface Props {
@@ -22,6 +23,7 @@ export default function RecordTable({ records, allRecords = records, archived = 
           {!records.length && <tr><td colSpan={7} className="empty">No records found.</td></tr>}
           {records.map((record) => {
             const history = histories.get(applicantIdentityKey(record));
+            const household = householdSummaryForRecord(record, allRecords);
             return (
             <tr key={record.id}>
               <td><strong>{record.surname}, {record.firstName} {record.middleName} {record.suffix}</strong></td>
@@ -33,6 +35,12 @@ export default function RecordTable({ records, allRecords = records, archived = 
                 <div className={`history-summary${(history?.applicationCount || 0) > 1 ? " returning" : ""}`}>
                   <strong>{formatPeso(history?.totalGranted || record.amount)}</strong>
                   <span>{history?.applicationCount || 1} application{(history?.applicationCount || 1) === 1 ? "" : "s"} total</span>
+                  {household.confirmedConnections.length > 0 && (
+                    <span className="household-confirmed-mini">Household: {formatPeso(household.confirmedAssistance)}</span>
+                  )}
+                  {household.possibleConnections.length > 0 && (
+                    <span className="household-possible-mini">{household.possibleConnections.length} possible relative{household.possibleConnections.length === 1 ? "" : "s"}</span>
+                  )}
                 </div>
               </td>
               <td className="actions">

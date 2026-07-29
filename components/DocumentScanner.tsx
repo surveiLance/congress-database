@@ -3,7 +3,9 @@
 import { ChangeEvent, useState } from "react";
 import Image from "next/image";
 import { confidentMatchThreshold, ScoredRecordMatch, scoreDocumentMatches } from "@/lib/scoredMatching";
+import { householdSummaryForRecord } from "@/lib/householdMatching";
 import { AssistanceRecord } from "@/lib/types";
+import HouseholdConnections from "./HouseholdConnections";
 
 interface Props {
   records: AssistanceRecord[];
@@ -109,12 +111,13 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
           </div>
           <div className="table-container">
             <table>
-              <thead><tr><th>Rank</th><th>Applicant</th><th>Birthday</th><th>Barangay</th><th>Match</th><th>Matched Fields</th><th>Staff Action</th></tr></thead>
+              <thead><tr><th>Rank</th><th>Applicant</th><th>Birthday</th><th>Barangay</th><th>Match</th><th>Household Check</th><th>Matched Fields</th><th>Staff Action</th></tr></thead>
               <tbody>
-                {!matches.length && <tr><td colSpan={7} className="empty">No applicants matched the readable information. Try a clearer photo or search the records manually.</td></tr>}
+                {!matches.length && <tr><td colSpan={8} className="empty">No applicants matched the readable information. Try a clearer photo or search the records manually.</td></tr>}
                 {matches.map((match, index) => {
                   const { record } = match;
                   const isConfirmed = record.id !== undefined && confirmedId === record.id;
+                  const household = householdSummaryForRecord(record, records);
                   return (
                     <tr key={record.id}>
                       <td>#{index + 1}</td>
@@ -122,6 +125,13 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
                       <td>{record.birthday}</td>
                       <td>{record.brgy}</td>
                       <td><span className={`match-percentage${match.percentage < confidentMatchThreshold ? " low" : ""}`}>{match.percentage}%</span></td>
+                      <td>
+                        {household.confirmedConnections.length > 0
+                          ? <span className="scanner-household confirmed">{household.confirmedConnections.length} confirmed</span>
+                          : household.possibleConnections.length > 0
+                            ? <span className="scanner-household possible">{household.possibleConnections.length} possible relative{household.possibleConnections.length === 1 ? "" : "s"}</span>
+                            : <span className="scanner-household none">None found</span>}
+                      </td>
                       <td>
                         <div className="matched-fields">
                           {match.matchedFields.length
@@ -159,6 +169,7 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
                   {attached ? "Document Attached ✓" : attaching ? "Attaching…" : "Attach Document to Record"}
                 </button>
               </div>
+              <HouseholdConnections record={confirmedMatch.record} allRecords={records} compact />
               {attached && <div className="confirmed-match-message" role="status">The scanned document is now attached to this existing record.</div>}
             </section>
           )}

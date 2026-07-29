@@ -4,7 +4,8 @@ import { applicantIdentityKey } from "./applicantIdentity";
 export const recordFields: (keyof AssistanceRecord)[] = [
   "id", "surname", "firstName", "middleName", "suffix", "birthday", "age",
   "sex", "contact", "idNumber", "brgy", "address", "work", "salary", "employedStatus",
-  "householdMembers", "totalEmployed", "monthlyExpenses", "civilStatus", "category",
+  "householdMembers", "familyComposition", "confirmedRelativeKeys", "dismissedRelativeKeys",
+  "totalEmployed", "monthlyExpenses", "civilStatus", "category",
   "assistanceType", "amountRequested", "amount", "relationship", "benName", "benBday", "benAge",
   "benSex", "benFamilyMember", "benCivilStatus", "benCategory", "diagnosis",
   "conditionCategories", "conditionOther", "remarks", "idImage", "createdAt",
@@ -201,6 +202,8 @@ export function recordsToCsv(records: AssistanceRecord[]): string {
 }
 
 function csvCell(value: unknown): string {
-  const text = String(value ?? "");
+  const text = Array.isArray(value) || (value && typeof value === "object")
+    ? JSON.stringify(value)
+    : String(value ?? "");
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }

@@ -1,8 +1,21 @@
 import { AssistanceRecord } from "@/lib/types";
 import { formatPeso, historyForRecord } from "@/lib/applicantIdentity";
 import Image from "next/image";
+import HouseholdConnections from "./HouseholdConnections";
 
-export default function ViewRecordModal({ record, allRecords, onClose }: { record: AssistanceRecord | null; allRecords: AssistanceRecord[]; onClose: () => void }) {
+export default function ViewRecordModal({
+  record,
+  allRecords,
+  onClose,
+  onView,
+  onUpdate,
+}: {
+  record: AssistanceRecord | null;
+  allRecords: AssistanceRecord[];
+  onClose: () => void;
+  onView?: (record: AssistanceRecord) => void;
+  onUpdate?: (record: AssistanceRecord) => Promise<void>;
+}) {
   if (!record) return null;
   const history = historyForRecord(record, allRecords);
   const applications = history?.records || [record];
@@ -27,6 +40,7 @@ export default function ViewRecordModal({ record, allRecords, onClose }: { recor
             <small>Across all recorded applications</small>
           </div>
         </section>
+        <HouseholdConnections record={record} allRecords={allRecords} onView={onView} onUpdate={onUpdate} />
         <h3 className="section-title">Application History</h3>
         <div className="application-history-list">
           {applications.map((application) => (

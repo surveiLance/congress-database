@@ -43,6 +43,11 @@ export function standardizeApplicantText(record: AssistanceRecord): AssistanceRe
     diagnosis: cleanSpacing(record.diagnosis),
     conditionOther: cleanSpacing(record.conditionOther),
     remarks: cleanSpacing(record.remarks),
+    familyComposition: record.familyComposition.map((member) => ({
+      fullName: cleanName(member.fullName),
+      relationship: cleanSpacing(member.relationship),
+      birthday: member.birthday,
+    })),
   };
 }
 

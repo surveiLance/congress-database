@@ -48,6 +48,10 @@ Active records can be edited or archived. Archived records are excluded from act
 
 Every assistance request remains a separate application, while surname, first name, and birthday are normalized to identify the same applicant despite capitalization, punctuation, spacing, or common date-format differences. The encoding form warns staff about prior applications and shows the amount previously granted. The records table and full history view show each application alongside the applicant's cumulative assistance total. New and imported applicant names are standardized to uppercase for consistent display.
 
+## Household and related applicants
+
+Applications can include a compact family-composition list with names, relationships, and optional birthdays. The system suggests possible related applicants using declared family members, shared addresses, contact numbers, and surnames, while requiring staff to confirm or dismiss every relationship. Confirmed household assistance totals appear in applicant history and document matching. Existing records remain compatible and load with an empty family list.
+
 ## Dashboard reports
 
 Summary cards and aggregate charts update from the same searched and filtered IndexedDB records shown in the table. Charts use broad categories without applicant names or contact information. Use **Print Report** to print or save the dashboard as a PDF through the browser.

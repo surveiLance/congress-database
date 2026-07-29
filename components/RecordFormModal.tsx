@@ -11,7 +11,7 @@ import {
   standardizeApplicantText,
 } from "@/lib/applicantIdentity";
 import { conditionCategories } from "@/lib/conditionCategories";
-import { AssistanceRecord, emptyRecord } from "@/lib/types";
+import { AssistanceRecord, emptyRecord, FamilyMember } from "@/lib/types";
 
 interface Props {
   open: boolean;
@@ -89,6 +89,9 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
       civilStatus: existing.civilStatus,
       category: existing.category,
       householdMembers: existing.householdMembers,
+      familyComposition: existing.familyComposition.map((member) => ({ ...member })),
+      confirmedRelativeKeys: [...existing.confirmedRelativeKeys],
+      dismissedRelativeKeys: [...existing.dismissedRelativeKeys],
       totalEmployed: existing.totalEmployed,
       monthlyExpenses: existing.monthlyExpenses,
       diagnosis: existing.diagnosis,
@@ -113,6 +116,36 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
         conditionOther: category === "Other" && selected ? "" : current.conditionOther,
       };
     });
+  };
+
+  const addFamilyMember = () => {
+    setForm((current) => {
+      const familyComposition = [
+        ...current.familyComposition,
+        { fullName: "", relationship: "", birthday: "" },
+      ];
+      return {
+        ...current,
+        familyComposition,
+        householdMembers: Math.max(current.householdMembers, familyComposition.length + 1),
+      };
+    });
+  };
+
+  const updateFamilyMember = (index: number, key: keyof FamilyMember, value: string) => {
+    setForm((current) => ({
+      ...current,
+      familyComposition: current.familyComposition.map((member, memberIndex) =>
+        memberIndex === index ? { ...member, [key]: value } : member,
+      ),
+    }));
+  };
+
+  const removeFamilyMember = (index: number) => {
+    setForm((current) => ({
+      ...current,
+      familyComposition: current.familyComposition.filter((_, memberIndex) => memberIndex !== index),
+    }));
   };
 
   const fileChanged = (event: ChangeEvent<HTMLInputElement>) => {
@@ -292,6 +325,55 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                 </Field>
                 <Field label="Employed Household Members"><input type="number" min="0" value={form.totalEmployed} onFocus={selectInitialZero} onChange={(e) => update("totalEmployed", Number(e.target.value))} /></Field>
                 <Field label="Monthly Expenses (₱)"><input type="number" min="0" step=".01" value={form.monthlyExpenses} onFocus={selectInitialZero} onChange={(e) => update("monthlyExpenses", Number(e.target.value))} /></Field>
+                <div className="family-composition-editor">
+                  <div className="family-composition-heading">
+                    <div>
+                      <strong>Family or Household Members</strong>
+                      <small>List names when known so the system can find previous applicants from the same family.</small>
+                    </div>
+                    <button className="btn secondary small" type="button" onClick={addFamilyMember}>+ Add Member</button>
+                  </div>
+                  {!form.familyComposition.length && (
+                    <div className="family-composition-empty">
+                      No members listed yet. The total household count above can still be used by itself.
+                    </div>
+                  )}
+                  {form.familyComposition.map((member, index) => (
+                    <div className="family-member-row" key={index}>
+                      <label>
+                        <span>Full name</span>
+                        <input
+                          value={member.fullName}
+                          placeholder="Family member’s full name"
+                          onChange={(event) => updateFamilyMember(index, "fullName", event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        <span>Relationship</span>
+                        <select value={member.relationship} onChange={(event) => updateFamilyMember(index, "relationship", event.target.value)}>
+                          <option value="">Select</option>
+                          {["Spouse", "Parent", "Child", "Sibling", "Grandparent", "Grandchild", "Guardian", "Other"].map((option) => (
+                            <option value={option} key={option}>{option}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        <span>Birthday (if known)</span>
+                        <input type="date" value={member.birthday} onChange={(event) => updateFamilyMember(index, "birthday", event.target.value)} />
+                      </label>
+                      <button className="family-member-remove" type="button" onClick={() => removeFamilyMember(index)} aria-label={`Remove family member ${index + 1}`}>&times;</button>
+                    </div>
+                  ))}
+                  {form.familyComposition.length > 0 && (
+                    <button
+                      className="family-count-helper"
+                      type="button"
+                      onClick={() => update("householdMembers", form.familyComposition.length + 1)}
+                    >
+                      Use listed household count: applicant + {form.familyComposition.length} member{form.familyComposition.length === 1 ? "" : "s"} = {form.familyComposition.length + 1}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
