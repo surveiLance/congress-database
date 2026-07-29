@@ -2,7 +2,23 @@
 
 A Next.js App Router application for managing local assistance-program records. It preserves the original dashboard, applicant form, record details, search, deletion, statistics, ID attachment, OCR scanning, and scanned-document matching.
 
-Records remain stored locally in the browser using the existing IndexedDB database (`AssistanceProgramDB`) and `records` object store. Existing records created by the original HTML application remain compatible when the app is opened in the same browser and origin.
+The application supports a shared Supabase database for authenticated staff. Until Supabase environment variables are added, it continues using the existing browser IndexedDB database (`AssistanceProgramDB`) and `records` object store. Existing records created by the original HTML application remain compatible and can be copied into the shared database from Utilities.
+
+## Shared Supabase database
+
+1. Create a Supabase project.
+2. Open **SQL Editor** and run [`supabase/schema.sql`](supabase/schema.sql).
+3. In **Authentication → Sign In / Providers**, turn off **Allow new users to sign up** and keep anonymous sign-ins disabled.
+4. In **Authentication → Users**, use **Add user** to create or invite approved staff accounts.
+5. Copy `.env.example` to `.env.local`.
+6. In the Supabase project **Connect** dialog, copy the Project URL and publishable key:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key
+```
+
+Never use a `service_role` or secret key in a `NEXT_PUBLIC_` variable. Once configured, authenticated staff share the same records and receive live record updates. Existing local records can be reviewed and copied from **Utilities → Move Existing Browser Records**.
 
 ## Backup and transfer
 
@@ -11,6 +27,10 @@ The dashboard can export complete JSON backups or CSV files and import either fo
 ## Record management
 
 Active records can be edited or archived. Archived records are excluded from active statistics, search, and document matching, and can be restored from the supervisor archived-records view. Permanent deletion is available only during development and requires typing an explicit confirmation.
+
+## Applicant assistance history
+
+Every assistance request remains a separate application, while surname, first name, and birthday are normalized to identify the same applicant despite capitalization, punctuation, spacing, or common date-format differences. The encoding form warns staff about prior applications and shows the amount previously granted. The records table and full history view show each application alongside the applicant's cumulative assistance total. New and imported applicant names are standardized to uppercase for consistent display.
 
 ## Dashboard reports
 
@@ -90,4 +110,4 @@ npm run lint
 
 ## Current storage and OCR
 
-IndexedDB is intentionally device- and browser-local for now. Tesseract.js performs OCR in the browser and may download its language worker data the first time a document is scanned. No Supabase or AI API integration is included.
+Supabase is the shared source of truth when configured; IndexedDB remains the backward-compatible local fallback and migration source. Tesseract.js performs OCR in the browser and may download its language worker data the first time a document is scanned. No external AI API integration is included.

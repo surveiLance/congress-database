@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { ChangeEvent, FormEvent, useMemo, useState } from "react";
+import { applicantIdentityKey, formatPeso, standardizeApplicantText } from "@/lib/applicantIdentity";
 import { conditionCategories } from "@/lib/conditionCategories";
 import { AssistanceRecord, emptyRecord } from "@/lib/types";
 
@@ -29,17 +30,26 @@ function ageFromBirthday(value: string) {
 export default function RecordFormModal({ open, initialRecord, existingRecords, onClose, onSave }: Props) {
   const [form, setForm] = useState<AssistanceRecord>(() => initialRecord ? { ...initialRecord } : { ...emptyRecord });
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
-  const duplicate = useMemo(() => {
-    const surname = normalizeDuplicatePart(form.surname);
-    const firstName = normalizeDuplicatePart(form.firstName);
-    if (!surname || !firstName || !form.birthday) return null;
-    return existingRecords.find((record) =>
-      record.id !== initialRecord?.id &&
-      normalizeDuplicatePart(record.surname) === surname &&
-      normalizeDuplicatePart(record.firstName) === firstName &&
-      record.birthday === form.birthday
-    ) || null;
+  const applicantHistory = useMemo(() => {
+    const key = applicantIdentityKey({
+      surname: form.surname,
+      firstName: form.firstName,
+      birthday: form.birthday,
+    });
+    if (!key) return null;
+    const applications = existingRecords
+      .filter((record) => applicantIdentityKey(record) === key)
+      .sort((first, second) => (Date.parse(second.createdAt) || 0) - (Date.parse(first.createdAt) || 0));
+    const priorApplications = applications.filter((record) => record.id !== initialRecord?.id);
+    if (!priorApplications.length) return null;
+    return {
+      applications,
+      priorApplications,
+      totalGranted: applications.reduce((sum, record) => sum + record.amount, 0),
+      latest: priorApplications[0],
+    };
   }, [existingRecords, form.birthday, form.firstName, form.surname, initialRecord?.id]);
 
   if (!open) return null;
@@ -71,20 +81,20 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (duplicate && !window.confirm(`A record already exists for ${duplicate.firstName} ${duplicate.surname} with the same birthday. Save anyway?`)) {
-      return;
-    }
     setSaving(true);
+    setSaveError("");
     try {
       const now = new Date().toISOString();
-      await onSave({
+      await onSave(standardizeApplicantText({
         ...form,
         id: initialRecord?.id,
         createdAt: initialRecord?.createdAt || now,
         updatedAt: now,
-      });
+      }));
       setForm({ ...emptyRecord });
       onClose();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "The record could not be saved.");
     } finally {
       setSaving(false);
     }
@@ -105,11 +115,20 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
         <form onSubmit={submit}>
           <div className="record-form-layout">
             <div className="record-form-fields">
-              {duplicate && (
-                <div className="duplicate-warning" role="alert">
-                  <strong>Possible duplicate:</strong> {duplicate.firstName} {duplicate.surname} has the same birthday ({duplicate.birthday}).
+              {applicantHistory && (
+                <div className="applicant-history-alert" role="status">
+                  <div>
+                    <span className="eyebrow">Existing applicant found</span>
+                    <strong>{applicantHistory.priorApplications.length} previous application{applicantHistory.priorApplications.length === 1 ? "" : "s"}</strong>
+                    <p>
+                      Previously granted: <b>{formatPeso(applicantHistory.priorApplications.reduce((sum, record) => sum + record.amount, 0))}</b>
+                      {applicantHistory.latest?.createdAt ? ` · Latest application ${new Date(applicantHistory.latest.createdAt).toLocaleDateString()}` : ""}
+                    </p>
+                  </div>
+                  <span className="history-total">Current recorded total: {formatPeso(applicantHistory.totalGranted)}</span>
                 </div>
               )}
+              {saveError && <div className="notice error" role="alert">{saveError}</div>}
               <div className="form-grid">
                 <h3 className="section-title">1. Name Details</h3>
                 <Field label="Surname *"><input autoFocus required value={form.surname} onChange={(e) => update("surname", e.target.value)} /></Field>
@@ -193,7 +212,7 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                 <input type="file" accept="image/*" capture="environment" onChange={fileChanged} />
               </label>
               {form.idImage && <button className="btn secondary small" type="button" onClick={() => update("idImage", null)}>Remove Photo</button>}
-              <p className="record-photo-note">The image is saved with the record in this browser only after you click Save Record.</p>
+              <p className="record-photo-note">The image is saved with this application only after you click Save Record.</p>
             </aside>
           </div>
           <div className="modal-footer">
@@ -204,10 +223,6 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
       </div>
     </div>
   );
-}
-
-function normalizeDuplicatePart(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function selectInitialZero(event: React.FocusEvent<HTMLInputElement>) {

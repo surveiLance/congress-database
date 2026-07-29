@@ -6,10 +6,13 @@ import ConditionMigration from "@/components/ConditionMigration";
 import Dashboard from "@/components/Dashboard";
 import DataTransfer from "@/components/DataTransfer";
 import DocumentScanner from "@/components/DocumentScanner";
+import LocalRecordsMigration from "@/components/LocalRecordsMigration";
 import RecordFormModal from "@/components/RecordFormModal";
 import RecordTable from "@/components/RecordTable";
+import StaffAuthGate from "@/components/StaffAuthGate";
 import ViewRecordModal from "@/components/ViewRecordModal";
-import { addRecord, deleteRecord, getRecords, updateRecord } from "@/lib/indexedDb";
+import { addRecord, deleteRecord, getRecords, subscribeToRecordChanges, updateRecord } from "@/lib/recordStore";
+import { getSupabaseClient } from "@/lib/supabase";
 import { AssistanceRecord } from "@/lib/types";
 
 type Workspace = "records" | "matching" | "reports" | "utilities";
@@ -22,6 +25,19 @@ const workspaces: Array<{ id: Workspace; label: string; shortLabel: string }> = 
 ];
 
 export default function Home() {
+  return (
+    <StaffAuthGate>
+      {(session) => (
+        <AssistanceApp
+          sharedDatabase={Boolean(session)}
+          staffEmail={session?.user.email || ""}
+        />
+      )}
+    </StaffAuthGate>
+  );
+}
+
+function AssistanceApp({ sharedDatabase, staffEmail }: { sharedDatabase: boolean; staffEmail: string }) {
   const [records, setRecords] = useState<AssistanceRecord[]>([]);
   const [workspace, setWorkspace] = useState<Workspace>("records");
   const [query, setQuery] = useState("");
@@ -37,9 +53,9 @@ export default function Home() {
       setError("");
     } catch (reason) {
       console.error(reason);
-      setError("The local database could not be opened in this browser.");
+      setError(sharedDatabase ? "The shared database could not be loaded." : "The local database could not be opened in this browser.");
     }
-  }, []);
+  }, [sharedDatabase]);
 
   useEffect(() => {
     let active = true;
@@ -51,10 +67,17 @@ export default function Home() {
       })
       .catch((reason) => {
         console.error(reason);
-        if (active) setError("The local database could not be opened in this browser.");
+        if (active) setError(sharedDatabase ? "The shared database could not be loaded." : "The local database could not be opened in this browser.");
       });
     return () => { active = false; };
-  }, []);
+  }, [sharedDatabase]);
+
+  useEffect(() => {
+    if (!sharedDatabase) return;
+    return subscribeToRecordChanges(() => {
+      void refresh();
+    });
+  }, [refresh, sharedDatabase]);
 
   const activeRecords = useMemo(() => records.filter((record) => !record.archivedAt), [records]);
   const archivedRecords = useMemo(() => records.filter((record) => Boolean(record.archivedAt)), [records]);
@@ -151,7 +174,20 @@ export default function Home() {
             <p className="district-subtitle">Congressional District Office</p>
           </div>
         </div>
-        <button className="btn header-action" onClick={openNewRecord}>+ New Application</button>
+        <div className="header-actions">
+          {sharedDatabase && (
+            <div className="shared-status" title={staffEmail}>
+              <span className="shared-status-dot" aria-hidden="true" />
+              <span>Shared database</span>
+            </div>
+          )}
+          {sharedDatabase && (
+            <button className="btn tertiary staff-sign-out" type="button" onClick={() => void getSupabaseClient().auth.signOut()}>
+              Sign out
+            </button>
+          )}
+          <button className="btn header-action" onClick={openNewRecord}>+ New Application</button>
+        </div>
       </header>
 
       <nav className="workspace-nav" aria-label="Main workspaces">
@@ -201,6 +237,7 @@ export default function Home() {
             </div>
             <RecordTable
               records={filtered}
+              allRecords={records}
               archived={showArchived}
               onView={setSelected}
               onEdit={showArchived ? undefined : openEditRecord}
@@ -241,6 +278,7 @@ export default function Home() {
               </div>
             </section>
             <div className="utility-stack">
+              {sharedDatabase && <LocalRecordsMigration sharedRecords={records} onChanged={refresh} />}
               <DataTransfer records={records} onChanged={refresh} />
               <ConditionMigration records={records} onChanged={refresh} />
             </div>
@@ -257,7 +295,7 @@ export default function Home() {
           onSave={save}
         />
       )}
-      <ViewRecordModal record={selected} onClose={() => setSelected(null)} />
+      <ViewRecordModal record={selected} allRecords={records} onClose={() => setSelected(null)} />
     </main>
   );
 }

@@ -15,26 +15,31 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { buildApplicantHistories } from "@/lib/applicantIdentity";
 import { AssistanceRecord } from "@/lib/types";
 
 const colors = ["#2563eb", "#16a34a", "#d97706", "#7c3aed", "#dc2626", "#0891b2", "#4f46e5", "#65a30d"];
 
 export default function Dashboard({ records }: { records: AssistanceRecord[] }) {
   const total = records.reduce((sum, record) => sum + record.amount, 0);
+  const histories = Array.from(buildApplicantHistories(records).values());
+  const applicants = histories.map((history) => history.latestApplication);
   const cards = [
-    ["Total Active Applicants", records.filter((record) => !record.archivedAt).length.toLocaleString()],
-    ["Male Applicants", countValue(records, "sex", "male").toLocaleString()],
-    ["Female Applicants", countValue(records, "sex", "female").toLocaleString()],
-    ["Senior Applicants", records.filter((record) => record.category.toLowerCase() === "senior" || Number(record.age) >= 60).length.toLocaleString()],
+    ["Unique Active Applicants", applicants.filter((record) => !record.archivedAt).length.toLocaleString()],
+    ["Returning Applicants", histories.filter((history) => history.applicationCount > 1).length.toLocaleString()],
+    ["Total Applications", records.length.toLocaleString()],
+    ["Male Applicants", countValue(applicants, "sex", "male").toLocaleString()],
+    ["Female Applicants", countValue(applicants, "sex", "female").toLocaleString()],
+    ["Senior Applicants", applicants.filter((record) => record.category.toLowerCase() === "senior" || Number(record.age) >= 60).length.toLocaleString()],
     ["Medical Assistance Cases", countValue(records, "assistanceType", "medical").toLocaleString()],
     ["Total Amount Granted", money(total)],
     ["Average Amount Granted", money(records.length ? total / records.length : 0)],
-    ["Recorded Diagnoses", records.filter((record) => record.diagnosis.trim()).length.toLocaleString()],
+    ["Applicants with Diagnoses", histories.filter((history) => history.records.some((record) => record.diagnosis.trim())).length.toLocaleString()],
   ];
 
-  const barangayCounts = groupCount(records, (record) => record.brgy || "Unspecified");
+  const barangayCounts = groupCount(applicants, (record) => record.brgy || "Unspecified");
   const assistanceCounts = groupCount(records, (record) => record.assistanceType || "Unspecified");
-  const sexCounts = groupCount(records, (record) => record.sex || "Unspecified");
+  const sexCounts = groupCount(applicants, (record) => record.sex || "Unspecified");
   const monthlyCounts = groupByMonth(records);
   const diagnosisCounts = groupConditionCategories(records).slice(0, 8);
   const barangayAmounts = groupSum(records, (record) => record.brgy || "Unspecified", (record) => record.amount);
@@ -44,7 +49,7 @@ export default function Dashboard({ records }: { records: AssistanceRecord[] }) 
       <div className="dashboard-heading">
         <div>
           <h2 id="dashboard-title">Dashboard Overview</h2>
-          <p>Aggregated report for {records.length} matching record{records.length === 1 ? "" : "s"}. Charts contain no applicant names or contact details.</p>
+          <p>Aggregated report for {histories.length} unique applicant{histories.length === 1 ? "" : "s"} across {records.length} application{records.length === 1 ? "" : "s"}. Charts contain no applicant names or contact details.</p>
         </div>
         <button className="btn secondary print-hide" type="button" onClick={() => window.print()}>Print Report</button>
       </div>

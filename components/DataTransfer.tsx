@@ -9,7 +9,7 @@ import {
   parseJsonImport,
   recordsToCsv,
 } from "@/lib/dataTransfer";
-import { addRecord, updateRecord } from "@/lib/indexedDb";
+import { addRecord, updateRecord, usesSharedDatabase } from "@/lib/recordStore";
 
 type ImportFormat = "JSON" | "CSV";
 
@@ -120,7 +120,7 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
       <section className="transfer-panel" aria-labelledby="transfer-title">
         <div>
           <h2 id="transfer-title">Data Backup & Transfer</h2>
-          <p>Export a backup or preview imported records before saving them to this browser.</p>
+          <p>Export a backup or preview imported records before saving them to the {usesSharedDatabase ? "shared database" : "current browser"}.</p>
         </div>
         <div className="transfer-actions">
           <button className="btn secondary" onClick={exportJson}>Export JSON</button>

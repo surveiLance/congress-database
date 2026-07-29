@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { suggestConditionCategories } from "@/lib/conditionCategories";
-import { updateRecord } from "@/lib/indexedDb";
+import { updateRecord } from "@/lib/recordStore";
 import { AssistanceRecord } from "@/lib/types";
 
 interface Suggestion {

@@ -1,4 +1,5 @@
 import { AssistanceRecord, normalizeRecord } from "./types";
+import { applicantIdentityKey } from "./applicantIdentity";
 
 export const recordFields: (keyof AssistanceRecord)[] = [
   "id", "surname", "firstName", "middleName", "suffix", "birthday", "age",
@@ -30,20 +31,16 @@ export interface ImportPreviewRow {
 }
 
 export function duplicateKey(record: Partial<AssistanceRecord>): string {
-  const fullName = [record.firstName, record.middleName, record.surname, record.suffix]
-    .map(normalizeNamePart)
-    .filter(Boolean)
-    .join(" ");
-  return `${fullName}|${String(record.birthday || "").trim()}`;
-}
-
-function normalizeNamePart(value: unknown): string {
-  return String(value || "")
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  const identity = applicantIdentityKey({
+    surname: String(record.surname || ""),
+    firstName: String(record.firstName || ""),
+    birthday: String(record.birthday || ""),
+  });
+  const applicationDate = String(record.createdAt || "").trim().slice(0, 19);
+  const assistanceType = String(record.assistanceType || "").trim().toLowerCase();
+  const amount = Number(record.amount) || 0;
+  const requested = Number(record.amountRequested) || 0;
+  return `${identity}|${applicationDate}|${assistanceType}|${amount}|${requested}`;
 }
 
 export function createImportPreview(
@@ -65,7 +62,7 @@ export function createImportPreview(
         rowNumber: index + 1,
         record: result.record,
         status: "duplicate",
-        errors: ["Duplicate applicant within this import file."],
+        errors: ["Duplicate application within this import file."],
       };
     }
     seenInFile.add(key);
@@ -76,7 +73,7 @@ export function createImportPreview(
         rowNumber: index + 1,
         record: result.record,
         status: "duplicate",
-        errors: ["Matches an existing applicant by full name and birthday."],
+        errors: ["Matches an existing application for this applicant, date, assistance type, and amount."],
         duplicateId: existingMatch.id,
       };
     }

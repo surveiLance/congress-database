@@ -1,13 +1,48 @@
 import { AssistanceRecord } from "@/lib/types";
+import { formatPeso, historyForRecord } from "@/lib/applicantIdentity";
 import Image from "next/image";
 
-export default function ViewRecordModal({ record, onClose }: { record: AssistanceRecord | null; onClose: () => void }) {
+export default function ViewRecordModal({ record, allRecords, onClose }: { record: AssistanceRecord | null; allRecords: AssistanceRecord[]; onClose: () => void }) {
   if (!record) return null;
-  const money = (value: number) => `₱${value.toLocaleString("en-US")}`;
+  const history = historyForRecord(record, allRecords);
+  const applications = history?.records || [record];
   return (
     <div className="modal active" role="dialog" aria-modal="true" aria-labelledby="profile-title">
       <div className="modal-content">
-        <div className="modal-header"><h2 id="profile-title">Applicant Full Record Profile</h2><button className="close" onClick={onClose} aria-label="Close">&times;</button></div>
+        <div className="modal-header"><h2 id="profile-title">Applicant Assistance History</h2><button className="close" onClick={onClose} aria-label="Close">&times;</button></div>
+        <section className="applicant-lifetime-summary" aria-label="Applicant cumulative assistance">
+          <div>
+            <span>Applicant</span>
+            <strong>{record.surname}, {record.firstName} {record.middleName}</strong>
+            <small>{record.birthday}</small>
+          </div>
+          <div>
+            <span>Total Applications</span>
+            <strong>{history?.applicationCount || 1}</strong>
+            <small>Matched by normalized name and birthday</small>
+          </div>
+          <div className="lifetime-total">
+            <span>Total Assistance Granted</span>
+            <strong>{formatPeso(history?.totalGranted || record.amount)}</strong>
+            <small>Across all recorded applications</small>
+          </div>
+        </section>
+        <h3 className="section-title">Application History</h3>
+        <div className="application-history-list">
+          {applications.map((application) => (
+            <article className={`application-history-item${application.id === record.id ? " selected" : ""}`} key={application.id}>
+              <div>
+                <strong>{formatTimestamp(application.createdAt, true)}</strong>
+                <span>{application.assistanceType || "Unspecified assistance"}</span>
+              </div>
+              <strong>{formatPeso(application.amount)}</strong>
+              <span className={`history-status${application.archivedAt ? " archived" : ""}`}>
+                {application.id === record.id ? "Selected" : application.archivedAt ? "Archived" : "Recorded"}
+              </span>
+            </article>
+          ))}
+        </div>
+        <p className="selected-application-label">Selected application details</p>
         <Details title="1. Applicant Details" rows={[
           ["Full Name", `${record.surname}, ${record.firstName} ${record.middleName} ${record.suffix}`],
           ["Birthday / Age / Sex", `${record.birthday} (${record.age} yrs) / ${record.sex}`],
@@ -20,14 +55,14 @@ export default function ViewRecordModal({ record, onClose }: { record: Assistanc
           ...(record.archivedAt ? [["Archived", formatTimestamp(record.archivedAt)]] : []),
         ]} />
         <Details title="2. Employment & Expenses" rows={[
-          ["Work & Salary", `${record.work || "N/A"} (${money(record.salary)}/mo) - ${record.employedStatus}`],
+          ["Work & Salary", `${record.work || "N/A"} (${formatPeso(record.salary)}/mo) - ${record.employedStatus}`],
           ["Household Employed", String(record.totalEmployed)],
-          ["Monthly Expenses", money(record.monthlyExpenses)],
+          ["Monthly Expenses", formatPeso(record.monthlyExpenses)],
         ]} />
         <Details title="3. Assistance Granted" rows={[
           ["Assistance Type", record.assistanceType],
-          ["Amount Requested", money(record.amountRequested)],
-          ["Amount Granted", money(record.amount)],
+          ["Amount Requested", formatPeso(record.amountRequested)],
+          ["Amount Granted", formatPeso(record.amount)],
           ["Relation to Beneficiary", record.relationship || "Self"],
         ]} />
         <Details title="4. Beneficiary Details" rows={[
@@ -50,8 +85,8 @@ function Details({ title, rows }: { title: string; rows: string[][] }) {
   return <><h3 className="section-title">{title}</h3>{rows.map(([label, value]) => <div className="detail-row" key={label}><strong>{label}:</strong><span>{value}</span></div>)}</>;
 }
 
-function formatTimestamp(value?: string) {
+function formatTimestamp(value?: string, dateOnly = false) {
   if (!value) return "Not recorded";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? value : dateOnly ? date.toLocaleDateString() : date.toLocaleString();
 }
