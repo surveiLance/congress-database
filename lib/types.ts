@@ -1,5 +1,15 @@
 import { normalizeConditionCategories } from "./conditionCategories";
 
+export type WorkflowStage = "intake" | "for-review" | "returned" | "approved" | "completed";
+
+export interface ApplicationDocument {
+  id: string;
+  category: string;
+  fileName: string;
+  dataUrl: string;
+  uploadedAt: string;
+}
+
 export interface AssistanceRecord {
   id?: number;
   surname: string;
@@ -40,6 +50,15 @@ export interface AssistanceRecord {
   createdAt: string;
   updatedAt?: string;
   archivedAt?: string;
+  workflowStage: WorkflowStage;
+  intakeDate: string;
+  submittedForReviewAt: string;
+  reviewedAt: string;
+  approvedAt: string;
+  encodedAt: string;
+  reviewNotes: string;
+  requirementChecks: string[];
+  documents: ApplicationDocument[];
 }
 
 export const emptyRecord: AssistanceRecord = {
@@ -53,6 +72,15 @@ export const emptyRecord: AssistanceRecord = {
   createdAt: "",
   updatedAt: "",
   archivedAt: "",
+  workflowStage: "completed",
+  intakeDate: "",
+  submittedForReviewAt: "",
+  reviewedAt: "",
+  approvedAt: "",
+  encodedAt: "",
+  reviewNotes: "",
+  requirementChecks: [],
+  documents: [],
 };
 
 export function normalizeRecord(record: Partial<AssistanceRecord>): AssistanceRecord {
@@ -72,5 +100,32 @@ export function normalizeRecord(record: Partial<AssistanceRecord>): AssistanceRe
     createdAt: record.createdAt || new Date().toISOString(),
     updatedAt: record.updatedAt || record.createdAt || "",
     archivedAt: record.archivedAt || "",
+    workflowStage: normalizeWorkflowStage(record.workflowStage),
+    intakeDate: record.intakeDate || "",
+    submittedForReviewAt: record.submittedForReviewAt || "",
+    reviewedAt: record.reviewedAt || "",
+    approvedAt: record.approvedAt || "",
+    encodedAt: record.encodedAt || "",
+    reviewNotes: record.reviewNotes || "",
+    requirementChecks: Array.isArray(record.requirementChecks) ? record.requirementChecks.map(String) : [],
+    documents: Array.isArray(record.documents)
+      ? record.documents.filter((document) => document && typeof document === "object").map((document) => ({
+        id: String(document.id || cryptoId()),
+        category: String(document.category || "Other Supporting Document"),
+        fileName: String(document.fileName || "Document"),
+        dataUrl: String(document.dataUrl || ""),
+        uploadedAt: String(document.uploadedAt || record.createdAt || new Date().toISOString()),
+      })).filter((document) => document.dataUrl)
+      : [],
   };
+}
+
+function normalizeWorkflowStage(value?: string): WorkflowStage {
+  return value === "intake" || value === "for-review" || value === "returned" || value === "approved"
+    ? value
+    : "completed";
+}
+
+function cryptoId() {
+  return `document-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
