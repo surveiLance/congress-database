@@ -74,18 +74,7 @@ export default function ViewRecordModal({ record, allRecords, onClose }: { recor
           ...(record.conditionOther ? [["Other Condition", record.conditionOther]] : []),
           ["Remarks", record.remarks || "None"],
         ]} />
-        <h3 className="section-title">5. Application Packet</h3>
-        {record.documents.length ? (
-          <div className="record-document-gallery">
-            {record.documents.map((document) => (
-              <a key={document.id} href={document.dataUrl} target="_blank" rel="noreferrer">
-                <Image unoptimized src={document.dataUrl} width={360} height={250} alt={document.category} />
-                <span>{document.category}</span>
-              </a>
-            ))}
-          </div>
-        ) : <p className="muted">No application packet photos attached.</p>}
-        <h3 className="section-title">6. Attached ID Photo</h3>
+        <h3 className="section-title">5. Attached ID Photo</h3>
         {record.idImage ? <Image unoptimized src={record.idImage} width={800} height={500} className="id-image-preview" alt="Attached valid ID" /> : <p className="muted">No ID attached for this record.</p>}
         <div className="modal-footer"><button className="btn secondary" onClick={onClose}>Close</button></div>
       </div>

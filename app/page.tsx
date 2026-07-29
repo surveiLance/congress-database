@@ -2,12 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AdvancedFilters, { defaultRecordFilters, RecordFilters } from "@/components/AdvancedFilters";
-import ApplicationWorkflow from "@/components/ApplicationWorkflow";
 import ConditionMigration from "@/components/ConditionMigration";
 import Dashboard from "@/components/Dashboard";
 import DataTransfer from "@/components/DataTransfer";
 import DocumentScanner from "@/components/DocumentScanner";
-import IntakeFormModal from "@/components/IntakeFormModal";
 import LocalRecordsMigration from "@/components/LocalRecordsMigration";
 import RecordFormModal from "@/components/RecordFormModal";
 import RecordTable from "@/components/RecordTable";
@@ -17,11 +15,9 @@ import { addRecord, deleteRecord, getRecords, subscribeToRecordChanges, updateRe
 import { getSupabaseClient } from "@/lib/supabase";
 import { AssistanceRecord } from "@/lib/types";
 
-type Workspace = "intake" | "review" | "records" | "matching" | "reports" | "utilities";
+type Workspace = "records" | "matching" | "reports" | "utilities";
 
 const workspaces: Array<{ id: Workspace; label: string; shortLabel: string }> = [
-  { id: "intake", label: "Intake Applications", shortLabel: "Intake" },
-  { id: "review", label: "Review & Approval", shortLabel: "Review" },
   { id: "records", label: "Applicant Records", shortLabel: "Records" },
   { id: "matching", label: "Document Matching", shortLabel: "Match" },
   { id: "reports", label: "Reports", shortLabel: "Reports" },
@@ -44,18 +40,13 @@ export default function Home() {
 
 function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabase: boolean; staffEmail: string; testMode: boolean }) {
   const [records, setRecords] = useState<AssistanceRecord[]>([]);
-  const [workspace, setWorkspace] = useState<Workspace>("intake");
+  const [workspace, setWorkspace] = useState<Workspace>("records");
   const [query, setQuery] = useState("");
   const [formOpen, setFormOpen] = useState(false);
-  const [intakeFormOpen, setIntakeFormOpen] = useState(false);
-  const [editingIntake, setEditingIntake] = useState<AssistanceRecord | null>(null);
-  const [completingWorkflow, setCompletingWorkflow] = useState(false);
   const [editing, setEditing] = useState<AssistanceRecord | null>(null);
   const [selected, setSelected] = useState<AssistanceRecord | null>(null);
   const [filters, setFilters] = useState<RecordFilters>({ ...defaultRecordFilters });
   const [error, setError] = useState("");
-  const intakeQueueCount = records.filter((record) => record.workflowStage === "intake" || record.workflowStage === "returned" || record.workflowStage === "approved").length;
-  const reviewQueueCount = records.filter((record) => record.workflowStage === "for-review").length;
 
   const refresh = useCallback(async () => {
     try {
@@ -89,9 +80,8 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     });
   }, [refresh, sharedDatabase]);
 
-  const completedRecords = useMemo(() => records.filter((record) => record.workflowStage === "completed"), [records]);
-  const activeRecords = useMemo(() => completedRecords.filter((record) => !record.archivedAt), [completedRecords]);
-  const archivedRecords = useMemo(() => completedRecords.filter((record) => Boolean(record.archivedAt)), [completedRecords]);
+  const activeRecords = useMemo(() => records.filter((record) => !record.archivedAt), [records]);
+  const archivedRecords = useMemo(() => records.filter((record) => Boolean(record.archivedAt)), [records]);
   const showArchived = filters.status === "archived";
   const visibleRecords = showArchived ? archivedRecords : activeRecords;
 
@@ -128,50 +118,22 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   }, [filters, query, visibleRecords]);
 
   const save = async (record: AssistanceRecord) => {
-    const savedRecord = completingWorkflow
-      ? { ...record, workflowStage: "completed" as const, encodedAt: new Date().toISOString() }
-      : record;
     if (record.id === undefined) {
-      await addRecord(savedRecord);
+      await addRecord(record);
     } else {
-      await updateRecord(savedRecord);
+      await updateRecord(record);
     }
     await refresh();
-    setCompletingWorkflow(false);
   };
 
-  const saveIntake = async (record: AssistanceRecord) => {
-    if (record.id === undefined) await addRecord(record);
-    else await updateRecord(record);
-    await refresh();
-  };
-
-  const openNewIntake = () => {
-    setEditingIntake(null);
-    setIntakeFormOpen(true);
-    setWorkspace("intake");
+  const openNewRecord = () => {
+    setEditing(null);
+    setFormOpen(true);
   };
 
   const openEditRecord = (record: AssistanceRecord) => {
-    setCompletingWorkflow(false);
     setEditing(record);
     setFormOpen(true);
-  };
-
-  const openEditIntake = (record: AssistanceRecord) => {
-    setEditingIntake(record);
-    setIntakeFormOpen(true);
-  };
-
-  const openCompleteEncoding = (record: AssistanceRecord) => {
-    setCompletingWorkflow(true);
-    setEditing(record);
-    setFormOpen(true);
-  };
-
-  const updateWorkflowRecord = async (record: AssistanceRecord) => {
-    await updateRecord(record);
-    await refresh();
   };
 
   const archive = async (record: AssistanceRecord) => {
@@ -234,7 +196,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               Sign out
             </button>
           )}
-          <button className="btn header-action" onClick={openNewIntake}>+ New Intake</button>
+          <button className="btn header-action" onClick={openNewRecord}>+ New Application</button>
         </div>
       </header>
 
@@ -249,8 +211,6 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
           >
             <span className="workspace-full-label">{item.label}</span>
             <span className="workspace-short-label">{item.shortLabel}</span>
-            {item.id === "intake" && intakeQueueCount > 0 && <span className="workspace-count">{intakeQueueCount}</span>}
-            {item.id === "review" && reviewQueueCount > 0 && <span className="workspace-count">{reviewQueueCount}</span>}
           </button>
         ))}
       </nav>
@@ -263,40 +223,6 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
           </div>
         )}
         {error && <div className="error" role="alert">{error}</div>}
-
-        <div className="workspace-view" hidden={workspace !== "intake"}>
-          <section className="workspace-intro compact">
-            <div>
-              <span className="eyebrow">First-level desk</span>
-              <h2>Receive and prepare applications</h2>
-              <p>Record the request date and applicant information, attach the complete paperwork packet, then send it upstairs for review.</p>
-            </div>
-          </section>
-          <ApplicationWorkflow
-            mode="intake"
-            records={records}
-            onEditIntake={openEditIntake}
-            onCompleteEncoding={openCompleteEncoding}
-            onUpdate={updateWorkflowRecord}
-          />
-        </div>
-
-        <div className="workspace-view" hidden={workspace !== "review"}>
-          <section className="workspace-intro compact">
-            <div>
-              <span className="eyebrow">Reviewer desk</span>
-              <h2>Check requirements and approve assistance</h2>
-              <p>Review the first-level packet, compare previous assistance, confirm the requirements, and enter the amount to grant.</p>
-            </div>
-          </section>
-          <ApplicationWorkflow
-            mode="review"
-            records={records}
-            onEditIntake={openEditIntake}
-            onCompleteEncoding={openCompleteEncoding}
-            onUpdate={updateWorkflowRecord}
-          />
-        </div>
 
         <div className="workspace-view" hidden={workspace !== "records"}>
             <section className="workspace-intro compact">
@@ -380,17 +306,9 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
           key={editing?.id ?? "new-record"}
           open
           initialRecord={editing}
-          existingRecords={completedRecords}
-          onClose={() => { setFormOpen(false); setEditing(null); setCompletingWorkflow(false); }}
+          existingRecords={records}
+          onClose={() => { setFormOpen(false); setEditing(null); }}
           onSave={save}
-        />
-      )}
-      {intakeFormOpen && (
-        <IntakeFormModal
-          key={editingIntake?.id ?? "new-intake"}
-          initialRecord={editingIntake}
-          onClose={() => { setIntakeFormOpen(false); setEditingIntake(null); }}
-          onSave={saveIntake}
         />
       )}
       <ViewRecordModal record={selected} allRecords={records} onClose={() => setSelected(null)} />

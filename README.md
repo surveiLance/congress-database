@@ -42,18 +42,7 @@ The dashboard can export complete JSON backups or CSV files and import either fo
 
 ## Record management
 
-Active records can be edited or archived. Archived records are excluded from active statistics, search, and document matching, and can be restored from the archived-records view. Archived applications can also be permanently deleted after typing an explicit irreversible-action confirmation.
-
-## Application handoff workflow
-
-New applications move through four shared stages:
-
-1. **Intake Applications** — first-level staff record the application date, requested amount, applicant, financial and household information, then attach the paperwork packet.
-2. **Review & Approval** — the reviewer checks the packet and previous assistance history, marks verified requirements, enters review notes, and either returns the packet or approves a grant.
-3. **Approved for Encoding** — the approved packet and locked granted amount return to the downstairs encoder for verification and completion.
-4. **Applicant Records** — completing encoding moves the application into the existing searchable records, history, dashboard, matching, backup, and archive workflows.
-
-Existing records without workflow fields are automatically treated as completed records. Packet uploads accept common browser image formats and HEIC/HEIF iPhone photos, resize them to a maximum of 1600 pixels, and compress them before saving. Up to 12 requirement photos can be attached to one application.
+Active records can be edited or archived. Archived records are excluded from active statistics, search, and document matching, and can be restored from the supervisor archived-records view. Permanent deletion is available only during development and requires typing an explicit confirmation.
 
 ## Applicant assistance history
 
@@ -61,7 +50,7 @@ Every assistance request remains a separate application, while surname, first na
 
 ## Dashboard reports
 
-Summary cards and aggregate charts update from the same searched and filtered records shown in the table. Hovering a chart group shows the applicants behind the aggregate, and clicking it opens the corresponding application list with a direct link to applicant history. Use **Print Report** to print or save the dashboard as a PDF through the browser.
+Summary cards and aggregate charts update from the same searched and filtered IndexedDB records shown in the table. Charts use broad categories without applicant names or contact information. Use **Print Report** to print or save the dashboard as a PDF through the browser.
 
 ## Condition categories
 
@@ -128,6 +117,4 @@ npm run lint
 
 ## Current storage and OCR
 
-Supabase is the shared source of truth when configured; IndexedDB remains the backward-compatible local fallback and migration source. During the current testing phase, compressed packet photos are stored inside each record's JSON so the workflow works without another Supabase migration. Before production use with many real applications, move these photos to a private Supabase Storage bucket and retain only protected file paths in the record to avoid exhausting database and network limits.
-
-Tesseract.js performs OCR in the browser and may download its language worker data the first time a document is scanned. No external AI API integration is included.
+Supabase is the shared source of truth when configured; IndexedDB remains the backward-compatible local fallback and migration source. Tesseract.js performs OCR in the browser and may download its language worker data the first time a document is scanned. No external AI API integration is included.

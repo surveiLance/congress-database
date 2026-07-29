@@ -39,7 +39,6 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [copiedApplicantKey, setCopiedApplicantKey] = useState("");
-  const finalEncoding = initialRecord?.workflowStage === "approved";
 
   const currentApplicantKey = applicantIdentityKey({
     surname: form.surname,
@@ -154,21 +153,12 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
     <div className="modal active" role="dialog" aria-modal="true" aria-labelledby="record-form-title">
       <div className="modal-content record-form-modal">
         <div className="modal-header">
-          <div>
-            {finalEncoding && <span className="eyebrow">Approved for encoding</span>}
-            <h2 id="record-form-title">{finalEncoding ? "Verify and Complete Record" : initialRecord ? "Edit Assistance Record" : "New Assistance Record"}</h2>
-          </div>
+          <h2 id="record-form-title">{initialRecord ? "Edit Assistance Record" : "New Assistance Record"}</h2>
           <button className="close" type="button" onClick={close} aria-label="Close">&times;</button>
         </div>
         <form onSubmit={submit}>
           <div className="record-form-layout">
             <div className="record-form-fields">
-              {finalEncoding && (
-                <div className="notice success">
-                  <strong>Reviewer-approved grant: {formatPeso(form.amount)}</strong><br />
-                  Verify the encoded details against the packet, complete any missing fields, then add it to Applicant Records.
-                </div>
-              )}
               {applicantHistories.length === 1 && (
                 <div className="applicant-history-alert" role="status">
                   <div>
@@ -259,7 +249,7 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                 <h3 className="section-title">6. Assistance Request</h3>
                 <Field label="Type of Assistance *"><Select required value={form.assistanceType} options={["Medical", "Financial", "Educational", "Burial"]} placeholder="Select Type" onChange={(v) => update("assistanceType", v)} /></Field>
                 <Field label="Amount Requested (₱)"><input type="number" min="0" step=".01" value={form.amountRequested} onFocus={selectInitialZero} onChange={(e) => update("amountRequested", Number(e.target.value))} /></Field>
-                <Field label="Amount Granted (₱) *"><input required readOnly={finalEncoding} type="number" min="0" step=".01" value={form.amount} onFocus={selectInitialZero} onChange={(e) => update("amount", Number(e.target.value))} /></Field>
+                <Field label="Amount Granted (₱) *"><input required type="number" min="0" step=".01" value={form.amount} onFocus={selectInitialZero} onChange={(e) => update("amount", Number(e.target.value))} /></Field>
                 <Field label="Relationship to Beneficiary"><input value={form.relationship} placeholder="e.g. Self, Parent, Child" onChange={(e) => update("relationship", e.target.value)} /></Field>
 
                 <h3 className="section-title">7. Beneficiary & Medical Details</h3>
@@ -307,20 +297,10 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
 
             <aside className="record-photo-reference" aria-labelledby="application-photo-title">
               <div>
-                <span className="eyebrow">{form.documents.length ? "Submitted packet" : "Reference Only"}</span>
-                <h3 id="application-photo-title">{form.documents.length ? `${form.documents.length} Requirement Photo${form.documents.length === 1 ? "" : "s"}` : "Application Photo"}</h3>
-                <p>Keep the paperwork visible while verifying the encoded information.</p>
+                <span className="eyebrow">Reference Only</span>
+                <h3 id="application-photo-title">Application Photo</h3>
+                <p>Keep the document visible while typing. No automatic extraction is performed.</p>
               </div>
-              {form.documents.length > 0 && (
-                <div className="encoding-packet-list">
-                  {form.documents.map((document) => (
-                    <a key={document.id} href={document.dataUrl} target="_blank" rel="noreferrer">
-                      <Image unoptimized src={document.dataUrl} width={300} height={220} alt={document.category} />
-                      <span>{document.category}</span>
-                    </a>
-                  ))}
-                </div>
-              )}
               <div className={`record-photo-frame${form.idImage ? " has-image" : ""}`}>
                 {form.idImage
                   ? <Image unoptimized src={form.idImage} width={1000} height={1300} alt="Application document reference" />
@@ -336,7 +316,7 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
           </div>
           <div className="modal-footer">
             <button type="button" className="btn secondary" onClick={close}>Cancel</button>
-            <button type="submit" className="btn" disabled={saving}>{saving ? "Saving..." : finalEncoding ? "Complete & Add to Records" : initialRecord ? "Save Changes" : "Save Record"}</button>
+            <button type="submit" className="btn" disabled={saving}>{saving ? "Saving..." : initialRecord ? "Save Changes" : "Save Record"}</button>
           </div>
         </form>
       </div>
