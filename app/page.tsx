@@ -86,27 +86,27 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   const visibleRecords = showArchived ? archivedRecords : activeRecords;
 
   const filtered = useMemo(() => {
-    const globalQuery = query.trim().toLowerCase();
-    const nameQuery = filters.name.trim().toLowerCase();
-    const diagnosisQuery = filters.diagnosis.trim().toLowerCase();
+    const globalQuery = searchTokens(query);
+    const nameQuery = searchTokens(filters.name);
+    const diagnosisQuery = searchTokens(filters.diagnosis);
     const matching = visibleRecords.filter((record) => {
-      const searchable = Object.values(record)
+      const searchable = normalizeSearchText(Object.values(record)
         .filter((value) => typeof value !== "string" || !value.startsWith("data:image/"))
-        .join(" ")
-        .toLowerCase();
-      const fullName = `${record.surname} ${record.firstName} ${record.middleName} ${record.suffix}`.toLowerCase();
+        .join(" "));
+      const fullName = normalizeSearchText(`${record.surname} ${record.firstName} ${record.middleName} ${record.suffix}`);
+      const diagnosis = normalizeSearchText(record.diagnosis);
       const createdDate = record.createdAt ? record.createdAt.slice(0, 10) : "";
 
-      return (!globalQuery || searchable.includes(globalQuery)) &&
-        (!nameQuery || fullName.includes(nameQuery)) &&
-        (!filters.barangay || record.brgy === filters.barangay) &&
-        (!filters.sex || record.sex === filters.sex) &&
+      return tokensMatch(globalQuery, searchable) &&
+        tokensMatch(nameQuery, fullName) &&
+        normalizedOptionMatches(filters.barangay, record.brgy) &&
+        normalizedOptionMatches(filters.sex, record.sex) &&
         inNumberRange(Number(record.age), filters.minAge, filters.maxAge) &&
-        (!filters.category || record.category === filters.category) &&
-        (!filters.assistanceType || record.assistanceType === filters.assistanceType) &&
-        (!diagnosisQuery || record.diagnosis.toLowerCase().includes(diagnosisQuery)) &&
-        (!filters.conditionCategory || record.conditionCategories.includes(filters.conditionCategory)) &&
-        (!filters.employmentStatus || record.employedStatus === filters.employmentStatus) &&
+        normalizedOptionMatches(filters.category, record.category) &&
+        normalizedOptionMatches(filters.assistanceType, record.assistanceType) &&
+        tokensMatch(diagnosisQuery, diagnosis) &&
+        (!filters.conditionCategory || record.conditionCategories.some((category) => normalizedOptionMatches(filters.conditionCategory, category))) &&
+        normalizedOptionMatches(filters.employmentStatus, record.employedStatus) &&
         inNumberRange(record.salary, filters.minIncome, filters.maxIncome) &&
         inNumberRange(record.monthlyExpenses, filters.minExpenses, filters.maxExpenses) &&
         inNumberRange(record.amount, filters.minAmount, filters.maxAmount) &&
@@ -305,6 +305,28 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
       <ViewRecordModal record={selected} allRecords={records} onClose={() => setSelected(null)} />
     </main>
   );
+}
+
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("en-PH")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function searchTokens(value: string) {
+  const normalized = normalizeSearchText(value);
+  return normalized ? Array.from(new Set(normalized.split(" "))) : [];
+}
+
+function tokensMatch(tokens: string[], searchable: string) {
+  return tokens.every((token) => searchable.includes(token));
+}
+
+function normalizedOptionMatches(filterValue: string, recordValue: string) {
+  return !filterValue || normalizeSearchText(filterValue) === normalizeSearchText(recordValue);
 }
 
 function inNumberRange(value: number, minimum: string, maximum: string) {
