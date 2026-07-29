@@ -16,9 +16,25 @@ The application supports a shared Supabase database for authenticated staff. Unt
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key
+NEXT_PUBLIC_SUPABASE_TEST_MODE=false
 ```
 
 Never use a `service_role` or secret key in a `NEXT_PUBLIC_` variable. Once configured, authenticated staff share the same records and receive live record updates. Existing local records can be reviewed and copied from **Utilities → Move Existing Browser Records**.
+
+### Temporary intern testing mode
+
+For a short-lived shared test environment, enable **Anonymous Sign-Ins** in the
+Supabase Authentication settings and set:
+
+```bash
+NEXT_PUBLIC_SUPABASE_TEST_MODE=true
+```
+
+The application then creates a temporary authenticated Supabase session in each
+browser without displaying the staff login. Existing RLS policies still apply,
+but anyone with the deployed URL can view and change the shared test records.
+Use dummy data only, and set this variable back to `false` before entering real
+applicant information.
 
 ## Backup and transfer
 

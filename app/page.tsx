@@ -31,13 +31,14 @@ export default function Home() {
         <AssistanceApp
           sharedDatabase={Boolean(session)}
           staffEmail={session?.user.email || ""}
+          testMode={Boolean(session?.user.is_anonymous)}
         />
       )}
     </StaffAuthGate>
   );
 }
 
-function AssistanceApp({ sharedDatabase, staffEmail }: { sharedDatabase: boolean; staffEmail: string }) {
+function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabase: boolean; staffEmail: string; testMode: boolean }) {
   const [records, setRecords] = useState<AssistanceRecord[]>([]);
   const [workspace, setWorkspace] = useState<Workspace>("records");
   const [query, setQuery] = useState("");
@@ -178,10 +179,10 @@ function AssistanceApp({ sharedDatabase, staffEmail }: { sharedDatabase: boolean
           {sharedDatabase && (
             <div className="shared-status" title={staffEmail}>
               <span className="shared-status-dot" aria-hidden="true" />
-              <span>Shared database</span>
+              <span>{testMode ? "Shared test database" : "Shared database"}</span>
             </div>
           )}
-          {sharedDatabase && (
+          {sharedDatabase && !testMode && (
             <button className="btn tertiary staff-sign-out" type="button" onClick={() => void getSupabaseClient().auth.signOut()}>
               Sign out
             </button>
@@ -206,6 +207,12 @@ function AssistanceApp({ sharedDatabase, staffEmail }: { sharedDatabase: boolean
       </nav>
 
       <div className="workspace-surface">
+        {testMode && (
+          <div className="test-mode-banner" role="status">
+            <strong>Temporary shared testing mode</strong>
+            <span>No login is required. Use dummy applicant information only—do not enter real personal data.</span>
+          </div>
+        )}
         {error && <div className="error" role="alert">{error}</div>}
 
         <div className="workspace-view" hidden={workspace !== "records"}>

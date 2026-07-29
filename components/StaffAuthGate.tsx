@@ -2,7 +2,7 @@
 
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Session } from "@supabase/supabase-js";
-import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
+import { getSupabaseClient, isSupabaseConfigured, isSupabaseTestMode } from "@/lib/supabase";
 
 interface Props {
   children: (session: Session | null) => ReactNode;
@@ -19,15 +19,45 @@ export default function StaffAuthGate({ children }: Props) {
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     const client = getSupabaseClient();
-    void client.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setReady(true);
-    });
+    let active = true;
     const { data } = client.auth.onAuthStateChange((_event, nextSession) => {
+      if (!active) return;
       setSession(nextSession);
       setReady(true);
     });
-    return () => data.subscription.unsubscribe();
+
+    void client.auth.getSession().then(async ({ data: sessionData, error: sessionError }) => {
+      if (!active) return;
+      if (sessionError) {
+        setMessage(sessionError.message);
+        setReady(true);
+        return;
+      }
+      if (sessionData.session) {
+        setSession(sessionData.session);
+        setReady(true);
+        return;
+      }
+      if (!isSupabaseTestMode) {
+        setReady(true);
+        return;
+      }
+
+      const { data: anonymousData, error } = await client.auth.signInAnonymously();
+      if (!active) return;
+      if (error) {
+        setMessage(error.message);
+        setReady(true);
+        return;
+      }
+      setSession(anonymousData.session);
+      setReady(true);
+    });
+
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (event: FormEvent) => {
@@ -46,6 +76,29 @@ export default function StaffAuthGate({ children }: Props) {
           <div className="district-mark" aria-hidden="true"><span>1ST</span></div>
           <p>Connecting to the district database…</p>
         </div>
+      </main>
+    );
+  }
+
+  if (isSupabaseConfigured && isSupabaseTestMode && !session) {
+    return (
+      <main className="access-page">
+        <section className="access-card" aria-labelledby="test-access-title">
+          <div className="access-brand">
+            <div className="district-mark" aria-hidden="true"><span>1ST</span></div>
+            <div>
+              <p className="district-kicker">Antipolo City · First District</p>
+              <h1 id="test-access-title">Shared Test Database</h1>
+              <p>The automatic testing session could not be opened.</p>
+            </div>
+          </div>
+          <div className="notice error" role="alert">
+            {message || "Enable anonymous sign-ins in the Supabase Authentication settings, then reload this page."}
+          </div>
+          <button className="btn primary" type="button" onClick={() => window.location.reload()}>
+            Try Again
+          </button>
+        </section>
       </main>
     );
   }
