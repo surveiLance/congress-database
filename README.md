@@ -74,25 +74,16 @@ npm run build
 npm start
 ```
 
-## Cloudflare deployment
+## Vercel deployment
 
-The application is configured for Cloudflare Workers through the OpenNext adapter.
-The regular `npm run dev` workflow remains unchanged.
+1. Import the GitHub repository into Vercel.
+2. Keep the automatically detected **Next.js** framework and default build settings.
+3. Set `main` as the production branch.
+4. Add the Supabase variables from `.env.example` in **Project Settings → Environment Variables** when the shared database is ready.
+5. Deploy the project.
 
-Preview the Cloudflare Worker locally:
-
-```bash
-npm run preview:cloudflare
-```
-
-Deploy the current version:
-
-```bash
-npm run deploy:cloudflare
-```
-
-The current deployment is available at
-[assistance-program-system.antipolo-first-district.workers.dev](https://assistance-program-system.antipolo-first-district.workers.dev).
+After the GitHub repository is connected, pushes to `main` update the production
+deployment and pushes to other branches create preview deployments.
 
 ## Code quality checks
 

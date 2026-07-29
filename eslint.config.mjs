@@ -10,9 +10,7 @@ const config = [
   {
     ignores: [
       ".next/**",
-      ".open-next/**",
       ".vinext/**",
-      ".wrangler/**",
       "dist/**",
       "node_modules/**",
       "backup/**",

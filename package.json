@@ -7,13 +7,9 @@
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "preview:cloudflare": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy:cloudflare": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "start": "next start"
   },
   "dependencies": {
-    "@opennextjs/cloudflare": "^1.20.2",
     "@supabase/supabase-js": "^2.111.0",
     "next": "^15.4.4",
     "react": "^19.1.0",
@@ -29,7 +25,6 @@
     "@types/react-dom": "^19.1.6",
     "eslint": "^9.32.0",
     "eslint-config-next": "15.5.22",
-    "typescript": "^5.8.3",
-    "wrangler": "^4.114.0"
+    "typescript": "^5.8.3"
   }
 }
