@@ -40,7 +40,7 @@ export default function RecordTable({ records, allRecords = records, archived = 
                 {!archived && onEdit && <button className="btn secondary small" onClick={() => onEdit(record)}>Edit</button>}
                 {!archived && onArchive && <button className="btn warning small" onClick={() => onArchive(record)}>Archive</button>}
                 {archived && onRestore && <button className="btn small" onClick={() => onRestore(record)}>Restore</button>}
-                {archived && onPermanentDelete && <button className="btn danger small" onClick={() => onPermanentDelete(record)}>Permanent Delete (Dev)</button>}
+                {archived && onPermanentDelete && <button className="btn danger small" onClick={() => onPermanentDelete(record)}>Delete Permanently</button>}
               </td>
             </tr>
           )})}

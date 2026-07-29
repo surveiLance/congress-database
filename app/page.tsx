@@ -149,11 +149,20 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   };
 
   const permanentlyDelete = async (record: AssistanceRecord) => {
-    if (process.env.NODE_ENV !== "development" || record.id === undefined) return;
-    const response = window.prompt(`DEVELOPMENT ONLY: Permanently deleting ${record.firstName} ${record.surname} cannot be undone. Type DELETE to continue.`);
+    if (record.id === undefined || !record.archivedAt) return;
+    const response = window.prompt(
+      `WARNING: Permanently deleting the archived application for ${record.firstName} ${record.surname} will remove it from applicant history, reports, and the shared database. This cannot be undone.\n\nType DELETE to continue.`,
+    );
     if (response !== "DELETE") return;
-    await deleteRecord(record.id);
-    await refresh();
+    try {
+      await deleteRecord(record.id);
+      await refresh();
+      setError("");
+      window.alert("The archived application was permanently deleted.");
+    } catch (reason) {
+      console.error(reason);
+      setError("The archived application could not be deleted. Please try again.");
+    }
   };
 
   const attachMatchedDocument = async (record: AssistanceRecord, imageData: string) => {
@@ -238,7 +247,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               </section>
               <AdvancedFilters filters={filters} records={records} matchingCount={filtered.length} onChange={setFilters} />
             </div>
-            {showArchived && <div className="archive-info"><strong>Archived Records</strong><span>Supervisors can review and restore records from this view.</span></div>}
+            {showArchived && <div className="archive-info"><strong>Archived Records</strong><span>Restore an application, or permanently delete it when it should no longer be included in applicant history and reports.</span></div>}
             <div className="record-results" role="status">
               <strong>{filtered.length}</strong> matching record{filtered.length === 1 ? "" : "s"}
             </div>
@@ -250,7 +259,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               onEdit={showArchived ? undefined : openEditRecord}
               onArchive={showArchived ? undefined : archive}
               onRestore={showArchived ? restore : undefined}
-              onPermanentDelete={showArchived && process.env.NODE_ENV === "development" ? permanentlyDelete : undefined}
+              onPermanentDelete={showArchived ? permanentlyDelete : undefined}
             />
         </div>
 
