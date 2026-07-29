@@ -273,7 +273,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
                 <p>Figures use the current record filters and contain no personally identifiable information.</p>
               </div>
             </section>
-            <Dashboard records={filtered} />
+            <Dashboard records={filtered} onView={setSelected} />
         </div>
 
         <div className="workspace-view" hidden={workspace !== "utilities"}>
