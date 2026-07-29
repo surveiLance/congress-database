@@ -4,7 +4,7 @@ import { applicantIdentityKey } from "./applicantIdentity";
 export const recordFields: (keyof AssistanceRecord)[] = [
   "id", "surname", "firstName", "middleName", "suffix", "birthday", "age",
   "sex", "contact", "idNumber", "brgy", "address", "work", "salary", "employedStatus",
-  "totalEmployed", "monthlyExpenses", "civilStatus", "category",
+  "householdMembers", "totalEmployed", "monthlyExpenses", "civilStatus", "category",
   "assistanceType", "amountRequested", "amount", "relationship", "benName", "benBday", "benAge",
   "benSex", "benFamilyMember", "benCivilStatus", "benCategory", "diagnosis",
   "conditionCategories", "conditionOther", "remarks", "idImage", "createdAt",
@@ -17,7 +17,7 @@ const requiredFields: (keyof AssistanceRecord)[] = [
 ];
 
 const numericFields = new Set<keyof AssistanceRecord>([
-  "id", "salary", "totalEmployed", "monthlyExpenses", "amountRequested", "amount",
+  "id", "salary", "householdMembers", "totalEmployed", "monthlyExpenses", "amountRequested", "amount",
 ]);
 
 export type PreviewStatus = "ready" | "duplicate" | "failed";

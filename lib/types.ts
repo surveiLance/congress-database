@@ -16,6 +16,7 @@ export interface AssistanceRecord {
   work: string;
   salary: number;
   employedStatus: string;
+  householdMembers: number;
   totalEmployed: number;
   monthlyExpenses: number;
   civilStatus: string;
@@ -44,7 +45,7 @@ export interface AssistanceRecord {
 export const emptyRecord: AssistanceRecord = {
   surname: "", firstName: "", middleName: "", suffix: "", birthday: "", age: "",
   sex: "", contact: "", idNumber: "", brgy: "", address: "", work: "", salary: 0,
-  employedStatus: "Employed", totalEmployed: 0, monthlyExpenses: 0,
+  employedStatus: "Employed", householdMembers: 0, totalEmployed: 0, monthlyExpenses: 0,
   civilStatus: "", category: "", assistanceType: "", amountRequested: 0, amount: 0, relationship: "",
   benName: "", benBday: "", benAge: "", benSex: "", benFamilyMember: "",
   benCivilStatus: "", benCategory: "", diagnosis: "", conditionCategories: [],
@@ -62,6 +63,7 @@ export function normalizeRecord(record: Partial<AssistanceRecord>): AssistanceRe
     amountRequested: Number(record.amountRequested) || 0,
     amount: Number(record.amount) || 0,
     monthlyExpenses: Number(record.monthlyExpenses) || 0,
+    householdMembers: Number(record.householdMembers) || 0,
     totalEmployed: Number(record.totalEmployed) || 0,
     conditionCategories: normalizeConditionCategories(record.conditionCategories),
     conditionOther: record.conditionOther || "",

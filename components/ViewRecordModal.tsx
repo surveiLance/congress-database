@@ -56,7 +56,8 @@ export default function ViewRecordModal({ record, allRecords, onClose }: { recor
         ]} />
         <Details title="2. Employment & Expenses" rows={[
           ["Work & Salary", `${record.work || "N/A"} (${formatPeso(record.salary)}/mo) - ${record.employedStatus}`],
-          ["Household Employed", String(record.totalEmployed)],
+          ["Total Household Members", record.householdMembers ? String(record.householdMembers) : "Not recorded"],
+          ["Employed Household Members", String(record.totalEmployed)],
           ["Monthly Expenses", formatPeso(record.monthlyExpenses)],
         ]} />
         <Details title="3. Assistance Granted" rows={[

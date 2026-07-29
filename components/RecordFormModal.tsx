@@ -31,16 +31,18 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
   const [form, setForm] = useState<AssistanceRecord>(() => initialRecord ? { ...initialRecord } : { ...emptyRecord });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [copiedApplicantKey, setCopiedApplicantKey] = useState("");
+
+  const currentApplicantKey = applicantIdentityKey({
+    surname: form.surname,
+    firstName: form.firstName,
+    birthday: form.birthday,
+  });
 
   const applicantHistory = useMemo(() => {
-    const key = applicantIdentityKey({
-      surname: form.surname,
-      firstName: form.firstName,
-      birthday: form.birthday,
-    });
-    if (!key) return null;
+    if (!currentApplicantKey) return null;
     const applications = existingRecords
-      .filter((record) => applicantIdentityKey(record) === key)
+      .filter((record) => applicantIdentityKey(record) === currentApplicantKey)
       .sort((first, second) => (Date.parse(second.createdAt) || 0) - (Date.parse(first.createdAt) || 0));
     const priorApplications = applications.filter((record) => record.id !== initialRecord?.id);
     if (!priorApplications.length) return null;
@@ -50,9 +52,40 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
       totalGranted: applications.reduce((sum, record) => sum + record.amount, 0),
       latest: priorApplications[0],
     };
-  }, [existingRecords, form.birthday, form.firstName, form.surname, initialRecord?.id]);
+  }, [currentApplicantKey, existingRecords, initialRecord?.id]);
 
   if (!open) return null;
+
+  const useExistingApplicantDetails = () => {
+    if (!applicantHistory?.latest) return;
+    const existing = applicantHistory.latest;
+    setForm((current) => ({
+      ...current,
+      surname: existing.surname,
+      firstName: existing.firstName,
+      middleName: existing.middleName,
+      suffix: existing.suffix,
+      birthday: existing.birthday,
+      age: ageFromBirthday(existing.birthday),
+      sex: existing.sex,
+      contact: existing.contact,
+      idNumber: existing.idNumber,
+      brgy: existing.brgy,
+      address: existing.address,
+      work: existing.work,
+      salary: existing.salary,
+      employedStatus: existing.employedStatus,
+      civilStatus: existing.civilStatus,
+      category: existing.category,
+      householdMembers: existing.householdMembers,
+      totalEmployed: existing.totalEmployed,
+      monthlyExpenses: existing.monthlyExpenses,
+      diagnosis: existing.diagnosis,
+      conditionCategories: [...existing.conditionCategories],
+      conditionOther: existing.conditionOther,
+    }));
+    setCopiedApplicantKey(currentApplicantKey);
+  };
 
   const update = <Key extends keyof AssistanceRecord>(key: Key, value: AssistanceRecord[Key]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -125,7 +158,21 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                       {applicantHistory.latest?.createdAt ? ` · Latest application ${new Date(applicantHistory.latest.createdAt).toLocaleDateString()}` : ""}
                     </p>
                   </div>
-                  <span className="history-total">Current recorded total: {formatPeso(applicantHistory.totalGranted)}</span>
+                  <div className="applicant-history-actions">
+                    <span className="history-total">Current recorded total: {formatPeso(applicantHistory.totalGranted)}</span>
+                    {!initialRecord && (
+                      <button className="btn history-fill-button" type="button" onClick={useExistingApplicantDetails}>
+                        Reuse Previous Applicant Information
+                      </button>
+                    )}
+                    {!initialRecord && (
+                      <small>
+                        Copies identity, contact, address, work, income, household, and health information.
+                        Assistance and beneficiary details are kept separate for this application.
+                      </small>
+                    )}
+                    {copiedApplicantKey === currentApplicantKey && <small role="status">Previous information copied. Review any changes before saving.</small>}
+                  </div>
                 </div>
               )}
               {saveError && <div className="notice error" role="alert">{saveError}</div>}
@@ -190,9 +237,18 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                 )}
                 <Field label="Remarks" full><textarea rows={2} value={form.remarks} onChange={(e) => update("remarks", e.target.value)} /></Field>
 
-                <h3 className="section-title">8. Expenses & Household</h3>
+                <h3 className="section-title">8. Household Composition & Expenses</h3>
+                <Field label="Total Household Members">
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.householdMembers}
+                    onFocus={selectInitialZero}
+                    onChange={(e) => update("householdMembers", Number(e.target.value))}
+                  />
+                </Field>
+                <Field label="Employed Household Members"><input type="number" min="0" value={form.totalEmployed} onFocus={selectInitialZero} onChange={(e) => update("totalEmployed", Number(e.target.value))} /></Field>
                 <Field label="Monthly Expenses (₱)"><input type="number" min="0" step=".01" value={form.monthlyExpenses} onFocus={selectInitialZero} onChange={(e) => update("monthlyExpenses", Number(e.target.value))} /></Field>
-                <Field label="Total Employed in Household"><input type="number" min="0" value={form.totalEmployed} onFocus={selectInitialZero} onChange={(e) => update("totalEmployed", Number(e.target.value))} /></Field>
               </div>
             </div>
 

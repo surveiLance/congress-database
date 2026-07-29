@@ -32,6 +32,7 @@ interface EncoderValues {
   conditionCategories: string[];
   remarks: string;
   monthlyExpenses: string;
+  householdMembers: string;
   householdEmployed: string;
 }
 
@@ -50,7 +51,7 @@ const fieldOrder: FieldKey[] = [
   "barangay", "address", "occupation", "monthlySalary", "employmentStatus",
   "civilStatus", "category", "assistanceType", "amountRequested", "amountGranted",
   "beneficiaryName", "relationship", "diagnosis", "conditionCategories", "remarks",
-  "monthlyExpenses", "householdEmployed",
+  "monthlyExpenses", "householdMembers", "householdEmployed",
 ];
 
 const labels: Record<FieldKey, string> = {
@@ -62,6 +63,7 @@ const labels: Record<FieldKey, string> = {
   amountGranted: "Amount Granted", beneficiaryName: "Beneficiary Name",
   relationship: "Relationship", diagnosis: "Diagnosis", conditionCategories: "Condition Categories",
   remarks: "Remarks", monthlyExpenses: "Monthly Expenses",
+  householdMembers: "Total Household Members",
   householdEmployed: "Household Employed Count",
 };
 
@@ -74,7 +76,7 @@ const selectOptions: Partial<Record<FieldKey, string[]>> = {
   assistanceType: ["Medical", "Financial", "Educational", "Burial"],
 };
 
-const numericFields = new Set<FieldKey>(["monthlySalary", "amountRequested", "amountGranted", "monthlyExpenses", "householdEmployed"]);
+const numericFields = new Set<FieldKey>(["monthlySalary", "amountRequested", "amountGranted", "monthlyExpenses", "householdMembers", "householdEmployed"]);
 const longTextFields = new Set<FieldKey>(["address", "diagnosis", "remarks"]);
 const requiredFields: FieldKey[] = ["surname", "firstName", "birthday", "sex", "contact", "barangay", "address", "civilStatus", "category", "assistanceType", "amountGranted"];
 const reviewSections: ReviewSection[] = [
@@ -105,8 +107,8 @@ const reviewSections: ReviewSection[] = [
   },
   {
     title: "Household",
-    description: "Monthly expenses and employed household members",
-    fields: ["monthlyExpenses", "householdEmployed"],
+    description: "Household size, monthly expenses, and employed members",
+    fields: ["householdMembers", "householdEmployed", "monthlyExpenses"],
   },
 ];
 
@@ -242,6 +244,7 @@ export default function ApplicationDocumentEncoder({ onSave }: { onSave: (record
         conditionCategories: values.conditionCategories,
         remarks: values.remarks,
         monthlyExpenses: Number(values.monthlyExpenses) || 0,
+        householdMembers: Number(values.householdMembers) || 0,
         totalEmployed: Number(values.householdEmployed) || 0,
         idImage: imageData,
         createdAt: now,
@@ -423,7 +426,7 @@ function emptyEncoderValues(): EncoderValues {
     barangay: "", address: "", occupation: "", monthlySalary: "", employmentStatus: "",
     civilStatus: "", category: "", assistanceType: "", amountRequested: "", amountGranted: "",
     beneficiaryName: "", relationship: "", diagnosis: "", conditionCategories: [], remarks: "",
-    monthlyExpenses: "", householdEmployed: "",
+    monthlyExpenses: "", householdMembers: "", householdEmployed: "",
   };
 }
 
@@ -494,6 +497,7 @@ function extractApplicationFromOcr(rawText: string): { values: EncoderValues; me
   setValue("diagnosis", labeledValue(lines, [/(?:diagnosis|medical\s+condition)\s*:?\s*(.*)$/i]));
   setValue("remarks", labeledValue(lines, [/(?:remarks|notes)\s*:?\s*(.*)$/i]));
   setValue("monthlyExpenses", moneyValue(labeledValue(lines, [/(?:monthly\s+expenses)\s*:?\s*(.*)$/i])));
+  setValue("householdMembers", moneyValue(labeledValue(lines, [/(?:total\s+(?:household|family)\s+members|household\s+size|family\s+size)\s*:?\s*(.*)$/i])));
   setValue("householdEmployed", moneyValue(labeledValue(lines, [/(?:household\s+employed(?:\s+count)?|total\s+employed)\s*:?\s*(.*)$/i])));
 
   const suggestedCategories = suggestConditionCategories(values.diagnosis);
