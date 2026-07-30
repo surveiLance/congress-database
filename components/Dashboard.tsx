@@ -5,21 +5,15 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
-  Legend,
+  ComposedChart,
   Line,
-  LineChart,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { buildApplicantHistories } from "@/lib/applicantIdentity";
+import { ApplicantHistory, buildApplicantHistories } from "@/lib/applicantIdentity";
 import { AssistanceRecord } from "@/lib/types";
-
-const colors = ["#2563eb", "#16a34a", "#d97706", "#7c3aed", "#dc2626", "#0891b2", "#4f46e5", "#65a30d"];
 
 interface DashboardProps {
   records: AssistanceRecord[];
@@ -32,6 +26,8 @@ export default function Dashboard({ records, onView }: DashboardProps) {
     const total = records.reduce((sum, record) => sum + record.amount, 0);
     const histories = Array.from(buildApplicantHistories(records).values());
     const applicants = histories.map((history) => history.latestApplication);
+    const canonicalBarangay = (record: AssistanceRecord) => normalizeBarangay(record.brgy);
+    const canonicalAssistance = (record: AssistanceRecord) => normalizeLabel(record.assistanceType);
     return {
       histories,
       cards: [
@@ -46,15 +42,15 @@ export default function Dashboard({ records, onView }: DashboardProps) {
         ["Average Amount Granted", money(records.length ? total / records.length : 0)],
         ["Applicants with Diagnoses", histories.filter((history) => history.records.some((record) => record.diagnosis.trim())).length.toLocaleString()],
       ],
-      barangayCounts: groupCount(applicants, (record) => record.brgy || "Unspecified"),
-      assistanceCounts: groupCount(records, (record) => record.assistanceType || "Unspecified"),
-      sexCounts: groupCount(applicants, (record) => record.sex || "Unspecified"),
+      barangayCounts: groupCount(applicants, canonicalBarangay, "applicants"),
+      assistanceCounts: groupCount(records, canonicalAssistance, "applications", true),
       monthlyCounts: groupByMonth(records),
-      diagnosisCounts: groupConditionCategories(records).slice(0, 8),
-      barangayAmounts: groupSum(records, (record) => record.brgy || "Unspecified", (record) => record.amount),
+      applicantFrequency: groupApplicantFrequency(histories),
+      ageGroups: groupAgeRanges(applicants),
+      barangayAmounts: groupSum(records, canonicalBarangay, (record) => record.amount),
     };
   }, [records]);
-  const { histories, cards, barangayCounts, assistanceCounts, sexCounts, monthlyCounts, diagnosisCounts, barangayAmounts } = report;
+  const { histories, cards, barangayCounts, assistanceCounts, monthlyCounts, applicantFrequency, ageGroups, barangayAmounts } = report;
   const openDrilldown = (chart: string, value: unknown) => {
     const group = chartDatumFromEvent(value);
     if (group) setDrilldown({ chart, group });
@@ -69,6 +65,7 @@ export default function Dashboard({ records, onView }: DashboardProps) {
         </div>
         <button className="btn secondary print-hide" type="button" onClick={() => window.print()}>Print Report</button>
       </div>
+      <p className="report-data-note">Barangay capitalization, spacing, and common abbreviations are combined in these charts. Open any bar or point to review the applications behind it.</p>
 
       <div className="grid-stats" aria-label="Program statistics">
         {cards.map(([label, value]) => (
@@ -84,64 +81,90 @@ export default function Dashboard({ records, onView }: DashboardProps) {
         <div className="chart-grid">
         <ChartCard title="Applicants by Barangay" hasData={barangayCounts.length > 0}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={barangayCounts} margin={{ top: 8, right: 8, left: -20, bottom: 44 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="name" angle={-35} textAnchor="end" interval={0} height={60} tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} />
+            <BarChart data={barangayCounts.slice(0, 16)} layout="vertical" margin={{ top: 8, right: 16, left: 12, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+              <XAxis type="number" allowDecimals={false} />
+              <YAxis type="category" dataKey="name" width={92} tick={{ fontSize: 10 }} />
               <Tooltip content={<ApplicantChartTooltip />} />
               <Bar dataKey="value" name="Applicants" fill="#2563eb" radius={[4, 4, 0, 0]} cursor="pointer" onClick={(entry) => openDrilldown("Applicants by Barangay", entry)} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Assistance Type Distribution" hasData={assistanceCounts.length > 0}>
-          <DistributionChart data={assistanceCounts} onSelect={(entry) => openDrilldown("Assistance Type Distribution", entry)} />
-        </ChartCard>
-
-        <ChartCard title="Sex Distribution" hasData={sexCounts.length > 0}>
-          <DistributionChart data={sexCounts} onSelect={(entry) => openDrilldown("Sex Distribution", entry)} />
-        </ChartCard>
-
-        <ChartCard title="Applications by Month" hasData={monthlyCounts.length > 0}>
+        <ChartCard title="Applications by Assistance Type" hasData={assistanceCounts.length > 0}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={monthlyCounts} margin={{ top: 8, right: 16, left: -20, bottom: 12 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} />
+            <BarChart data={assistanceCounts} layout="vertical" margin={{ top: 8, right: 16, left: 12, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+              <XAxis type="number" allowDecimals={false} />
+              <YAxis type="category" dataKey="name" width={92} tick={{ fontSize: 10 }} />
               <Tooltip content={<ApplicantChartTooltip />} />
-              <Line
-                type="monotone"
-                dataKey="value"
-                name="Applications"
-                stroke="#2563eb"
-                strokeWidth={3}
-                dot={{ r: 5, cursor: "pointer" }}
-                activeDot={{ r: 7, cursor: "pointer", onClick: (_event, entry) => openDrilldown("Applications by Month", entry) }}
-              />
-            </LineChart>
+              <Bar dataKey="value" name="Applications" fill="#7c3aed" radius={[0, 4, 4, 0]} cursor="pointer" onClick={(entry) => openDrilldown("Applications by Assistance Type", entry)} />
+            </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Top Standardized Condition Categories" hasData={diagnosisCounts.length > 0}>
+        <ChartCard title="Applications & Grants by Month" hasData={monthlyCounts.length > 0}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={diagnosisCounts} layout="vertical" margin={{ top: 8, right: 16, left: 20, bottom: 8 }}>
+            <ComposedChart data={monthlyCounts} margin={{ top: 8, right: 8, left: -12, bottom: 12 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="applications" allowDecimals={false} />
+              <YAxis yAxisId="amount" orientation="right" tickFormatter={compactMoney} width={48} />
+              <Tooltip content={<ApplicantChartTooltip />} />
+              <Bar
+                yAxisId="applications"
+                dataKey="value"
+                name="Applications"
+                fill="#2563eb"
+                radius={[4, 4, 0, 0]}
+                cursor="pointer"
+                onClick={(entry) => openDrilldown("Applications & Grants by Month", entry)}
+              />
+              <Line
+                yAxisId="amount"
+                type="monotone"
+                dataKey="amount"
+                name="Amount granted"
+                stroke="#16a34a"
+                strokeWidth={3}
+                dot={{ r: 4 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="First-time vs Returning Applicants" hasData={applicantFrequency.length > 0}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={applicantFrequency} layout="vertical" margin={{ top: 36, right: 24, left: 24, bottom: 36 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" allowDecimals={false} />
-              <YAxis type="category" dataKey="name" width={105} tick={{ fontSize: 11 }} />
+              <YAxis type="category" dataKey="name" width={112} tick={{ fontSize: 11 }} />
               <Tooltip content={<ApplicantChartTooltip />} />
-              <Bar dataKey="value" name="Cases" fill="#7c3aed" radius={[0, 4, 4, 0]} cursor="pointer" onClick={(entry) => openDrilldown("Top Standardized Condition Categories", entry)} />
+              <Bar dataKey="value" name="Applicants" fill="#0891b2" radius={[0, 4, 4, 0]} cursor="pointer" onClick={(entry) => openDrilldown("First-time vs Returning Applicants", entry)} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="Applicants by Age Group" hasData={ageGroups.length > 0}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={ageGroups} layout="vertical" margin={{ top: 8, right: 16, left: 12, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+              <XAxis type="number" allowDecimals={false} />
+              <YAxis type="category" dataKey="name" width={92} tick={{ fontSize: 10 }} />
+              <Tooltip content={<ApplicantChartTooltip />} />
+              <Bar dataKey="value" name="Applicants" fill="#d97706" radius={[0, 4, 4, 0]} cursor="pointer" onClick={(entry) => openDrilldown("Applicants by Age Group", entry)} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
         <ChartCard title="Amount Granted by Barangay" hasData={barangayAmounts.length > 0}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={barangayAmounts} margin={{ top: 8, right: 8, left: 8, bottom: 44 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="name" angle={-35} textAnchor="end" interval={0} height={60} tick={{ fontSize: 11 }} />
-              <YAxis tickFormatter={compactMoney} width={58} />
+            <BarChart data={barangayAmounts.slice(0, 16)} layout="vertical" margin={{ top: 8, right: 16, left: 12, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+              <XAxis type="number" tickFormatter={compactMoney} />
+              <YAxis type="category" dataKey="name" width={92} tick={{ fontSize: 10 }} />
               <Tooltip content={<ApplicantChartTooltip currency />} />
-              <Bar dataKey="value" name="Amount granted" fill="#16a34a" radius={[4, 4, 0, 0]} cursor="pointer" onClick={(entry) => openDrilldown("Amount Granted by Barangay", entry)} />
+              <Bar dataKey="value" name="Amount granted" fill="#16a34a" radius={[0, 4, 4, 0]} cursor="pointer" onClick={(entry) => openDrilldown("Amount Granted by Barangay", entry)} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -177,32 +200,26 @@ function ChartCard({ title, hasData, children }: { title: string; hasData: boole
   );
 }
 
-function DistributionChart({ data, onSelect }: { data: ChartDatum[]; onSelect: (value: unknown) => void }) {
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="45%" innerRadius={45} outerRadius={82} paddingAngle={2} cursor="pointer" onClick={onSelect}>
-          {data.map((entry, index) => <Cell key={entry.name} fill={colors[index % colors.length]} />)}
-        </Pie>
-        <Tooltip content={<ApplicantChartTooltip />} />
-        <Legend verticalAlign="bottom" height={40} />
-      </PieChart>
-    </ResponsiveContainer>
-  );
-}
-
 interface ChartDatum {
   name: string;
   value: number;
   records: AssistanceRecord[];
   key?: string;
+  amount?: number;
+  average?: number;
+  unit?: "applications" | "applicants";
 }
 
 function countValue(records: AssistanceRecord[], field: "sex" | "assistanceType", value: string) {
   return records.filter((record) => record[field].trim().toLowerCase() === value).length;
 }
 
-function groupCount(records: AssistanceRecord[], getGroup: (record: AssistanceRecord) => string): ChartDatum[] {
+function groupCount(
+  records: AssistanceRecord[],
+  getGroup: (record: AssistanceRecord) => string,
+  unit: ChartDatum["unit"] = "applications",
+  includeAmount = false,
+): ChartDatum[] {
   const groups = new Map<string, AssistanceRecord[]>();
   records.forEach((record) => {
     const group = getGroup(record);
@@ -214,6 +231,8 @@ function groupCount(records: AssistanceRecord[], getGroup: (record: AssistanceRe
     name,
     value: groupedRecords.length,
     records: groupedRecords,
+    unit,
+    amount: includeAmount ? groupedRecords.reduce((sum, record) => sum + record.amount, 0) : undefined,
   })).sort((first, second) => second.value - first.value);
 }
 
@@ -229,6 +248,9 @@ function groupSum(records: AssistanceRecord[], getGroup: (record: AssistanceReco
     name,
     value: groupedRecords.reduce((sum, record) => sum + getValue(record), 0),
     records: groupedRecords,
+    average: groupedRecords.length
+      ? groupedRecords.reduce((sum, record) => sum + getValue(record), 0) / groupedRecords.length
+      : 0,
   })).sort((first, second) => second.value - first.value);
 }
 
@@ -247,23 +269,89 @@ function groupByMonth(records: AssistanceRecord[]): ChartDatum[] {
     name: new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(new Date(`${key}-01T00:00:00`)),
     value: groupedRecords.length,
     records: groupedRecords,
+    amount: groupedRecords.reduce((sum, record) => sum + record.amount, 0),
+    unit: "applications" as const,
   })).sort((first, second) => String(first.key).localeCompare(String(second.key)));
 }
 
-function groupConditionCategories(records: AssistanceRecord[]): ChartDatum[] {
-  const groups = new Map<string, AssistanceRecord[]>();
-  records.forEach((record) => {
-    record.conditionCategories.forEach((category) => {
-      const groupedRecords = groups.get(category);
-      if (groupedRecords) groupedRecords.push(record);
-      else groups.set(category, [record]);
-    });
-  });
-  return Array.from(groups, ([name, groupedRecords]) => ({
-    name,
-    value: groupedRecords.length,
-    records: groupedRecords,
-  })).sort((first, second) => second.value - first.value);
+function groupApplicantFrequency(histories: ApplicantHistory[]): ChartDatum[] {
+  const firstTime = histories.filter((history) => history.applicationCount === 1);
+  const returning = histories.filter((history) => history.applicationCount > 1);
+  return [
+    {
+      name: "First-time",
+      value: firstTime.length,
+      records: firstTime.flatMap((history) => history.records),
+      unit: "applicants" as const,
+    },
+    {
+      name: "Returning",
+      value: returning.length,
+      records: returning.flatMap((history) => history.records),
+      unit: "applicants" as const,
+    },
+  ].filter((group) => group.value > 0);
+}
+
+function groupAgeRanges(records: AssistanceRecord[]): ChartDatum[] {
+  const order = ["Under 18", "18–29", "30–44", "45–59", "60+", "Not recorded"];
+  return groupCount(records, (record) => {
+    const age = applicantAge(record);
+    if (age === null) return "Not recorded";
+    if (age < 18) return "Under 18";
+    if (age < 30) return "18–29";
+    if (age < 45) return "30–44";
+    if (age < 60) return "45–59";
+    return "60+";
+  }, "applicants").sort((first, second) => order.indexOf(first.name) - order.indexOf(second.name));
+}
+
+function applicantAge(record: AssistanceRecord): number | null {
+  const birthday = String(record.birthday || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (birthday) {
+    const birthDate = new Date(Number(birthday[1]), Number(birthday[2]) - 1, Number(birthday[3]));
+    if (
+      birthDate.getFullYear() === Number(birthday[1]) &&
+      birthDate.getMonth() === Number(birthday[2]) - 1 &&
+      birthDate.getDate() === Number(birthday[3])
+    ) {
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      if (
+        today.getMonth() < birthDate.getMonth() ||
+        (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())
+      ) age -= 1;
+      if (age >= 0 && age <= 130) return age;
+    }
+  }
+  const recordedAge = Number(record.age);
+  return Number.isFinite(recordedAge) && recordedAge >= 0 && recordedAge <= 130 ? recordedAge : null;
+}
+
+function normalizeBarangay(value: string): string {
+  const normalized = normalizeSearchText(value);
+  if (!normalized) return "Unspecified";
+  const aliases: Record<string, string> = {
+    "bagong nayon": "Bagong Nayon",
+    "beverly hills": "Beverly Hills",
+    "de la paz": "Dela Paz",
+    "dela paz": "Dela Paz",
+    "munting dilaw": "Muntingdilaw",
+    muntingdilaw: "Muntingdilaw",
+    "san isidro": "San Isidro",
+    "sta cruz": "Sta. Cruz",
+    "santa cruz": "Sta. Cruz",
+  };
+  return aliases[normalized] || titleCase(normalized);
+}
+
+function normalizeLabel(value: string): string {
+  const normalized = normalizeSearchText(value);
+  return normalized ? titleCase(normalized) : "Unspecified";
+}
+
+function titleCase(value: string): string {
+  return value.replace(/\b\p{L}/gu, (letter) => letter.toLocaleUpperCase("en-PH"));
 }
 
 function chartDatumFromEvent(value: unknown): ChartDatum | null {
@@ -289,7 +377,9 @@ function ApplicantChartTooltip({
   return (
     <div className="applicant-chart-tooltip">
       <strong>{group.name}</strong>
-      <b>{currency ? money(group.value) : `${group.value} application${group.value === 1 ? "" : "s"}`}</b>
+      <b>{currency ? money(group.value) : `${group.value.toLocaleString()} ${group.unit || "applications"}`}</b>
+      {group.amount !== undefined && <small>Total granted: {money(group.amount)}</small>}
+      {group.average !== undefined && <small>Average grant: {money(group.average)}</small>}
       <span>{applicants.slice(0, 4).map(applicantName).join(", ")}</span>
       {applicants.length > 4 && <small>+{applicants.length - 4} more</small>}
       <small>Click the chart to view details</small>
