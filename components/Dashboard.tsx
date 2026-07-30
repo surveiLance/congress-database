@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -28,28 +28,33 @@ interface DashboardProps {
 
 export default function Dashboard({ records, onView }: DashboardProps) {
   const [drilldown, setDrilldown] = useState<{ chart: string; group: ChartDatum } | null>(null);
-  const total = records.reduce((sum, record) => sum + record.amount, 0);
-  const histories = Array.from(buildApplicantHistories(records).values());
-  const applicants = histories.map((history) => history.latestApplication);
-  const cards = [
-    ["Unique Active Applicants", applicants.filter((record) => !record.archivedAt).length.toLocaleString()],
-    ["Returning Applicants", histories.filter((history) => history.applicationCount > 1).length.toLocaleString()],
-    ["Total Applications", records.length.toLocaleString()],
-    ["Male Applicants", countValue(applicants, "sex", "male").toLocaleString()],
-    ["Female Applicants", countValue(applicants, "sex", "female").toLocaleString()],
-    ["Senior Applicants", applicants.filter((record) => record.category.toLowerCase() === "senior" || Number(record.age) >= 60).length.toLocaleString()],
-    ["Medical Assistance Cases", countValue(records, "assistanceType", "medical").toLocaleString()],
-    ["Total Amount Granted", money(total)],
-    ["Average Amount Granted", money(records.length ? total / records.length : 0)],
-    ["Applicants with Diagnoses", histories.filter((history) => history.records.some((record) => record.diagnosis.trim())).length.toLocaleString()],
-  ];
-
-  const barangayCounts = groupCount(applicants, (record) => record.brgy || "Unspecified");
-  const assistanceCounts = groupCount(records, (record) => record.assistanceType || "Unspecified");
-  const sexCounts = groupCount(applicants, (record) => record.sex || "Unspecified");
-  const monthlyCounts = groupByMonth(records);
-  const diagnosisCounts = groupConditionCategories(records).slice(0, 8);
-  const barangayAmounts = groupSum(records, (record) => record.brgy || "Unspecified", (record) => record.amount);
+  const report = useMemo(() => {
+    const total = records.reduce((sum, record) => sum + record.amount, 0);
+    const histories = Array.from(buildApplicantHistories(records).values());
+    const applicants = histories.map((history) => history.latestApplication);
+    return {
+      histories,
+      cards: [
+        ["Unique Active Applicants", applicants.filter((record) => !record.archivedAt).length.toLocaleString()],
+        ["Returning Applicants", histories.filter((history) => history.applicationCount > 1).length.toLocaleString()],
+        ["Total Applications", records.length.toLocaleString()],
+        ["Male Applicants", countValue(applicants, "sex", "male").toLocaleString()],
+        ["Female Applicants", countValue(applicants, "sex", "female").toLocaleString()],
+        ["Senior Applicants", applicants.filter((record) => record.category.toLowerCase() === "senior" || Number(record.age) >= 60).length.toLocaleString()],
+        ["Medical Assistance Cases", countValue(records, "assistanceType", "medical").toLocaleString()],
+        ["Total Amount Granted", money(total)],
+        ["Average Amount Granted", money(records.length ? total / records.length : 0)],
+        ["Applicants with Diagnoses", histories.filter((history) => history.records.some((record) => record.diagnosis.trim())).length.toLocaleString()],
+      ],
+      barangayCounts: groupCount(applicants, (record) => record.brgy || "Unspecified"),
+      assistanceCounts: groupCount(records, (record) => record.assistanceType || "Unspecified"),
+      sexCounts: groupCount(applicants, (record) => record.sex || "Unspecified"),
+      monthlyCounts: groupByMonth(records),
+      diagnosisCounts: groupConditionCategories(records).slice(0, 8),
+      barangayAmounts: groupSum(records, (record) => record.brgy || "Unspecified", (record) => record.amount),
+    };
+  }, [records]);
+  const { histories, cards, barangayCounts, assistanceCounts, sexCounts, monthlyCounts, diagnosisCounts, barangayAmounts } = report;
   const openDrilldown = (chart: string, value: unknown) => {
     const group = chartDatumFromEvent(value);
     if (group) setDrilldown({ chart, group });
@@ -144,6 +149,7 @@ export default function Dashboard({ records, onView }: DashboardProps) {
       </details>
       {drilldown && (
         <ChartApplicantModal
+          key={`${drilldown.chart}-${drilldown.group.key || drilldown.group.name}`}
           chart={drilldown.chart}
           group={drilldown.group}
           onClose={() => setDrilldown(null)}
@@ -200,7 +206,9 @@ function groupCount(records: AssistanceRecord[], getGroup: (record: AssistanceRe
   const groups = new Map<string, AssistanceRecord[]>();
   records.forEach((record) => {
     const group = getGroup(record);
-    groups.set(group, [...(groups.get(group) || []), record]);
+    const groupedRecords = groups.get(group);
+    if (groupedRecords) groupedRecords.push(record);
+    else groups.set(group, [record]);
   });
   return Array.from(groups, ([name, groupedRecords]) => ({
     name,
@@ -213,7 +221,9 @@ function groupSum(records: AssistanceRecord[], getGroup: (record: AssistanceReco
   const groups = new Map<string, AssistanceRecord[]>();
   records.forEach((record) => {
     const group = getGroup(record);
-    groups.set(group, [...(groups.get(group) || []), record]);
+    const groupedRecords = groups.get(group);
+    if (groupedRecords) groupedRecords.push(record);
+    else groups.set(group, [record]);
   });
   return Array.from(groups, ([name, groupedRecords]) => ({
     name,
@@ -228,7 +238,9 @@ function groupByMonth(records: AssistanceRecord[]): ChartDatum[] {
     const date = new Date(record.applicationDate || record.createdAt);
     if (Number.isNaN(date.getTime())) return;
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-    groups.set(key, [...(groups.get(key) || []), record]);
+    const groupedRecords = groups.get(key);
+    if (groupedRecords) groupedRecords.push(record);
+    else groups.set(key, [record]);
   });
   return Array.from(groups, ([key, groupedRecords]) => ({
     key,
@@ -241,7 +253,11 @@ function groupByMonth(records: AssistanceRecord[]): ChartDatum[] {
 function groupConditionCategories(records: AssistanceRecord[]): ChartDatum[] {
   const groups = new Map<string, AssistanceRecord[]>();
   records.forEach((record) => {
-    record.conditionCategories.forEach((category) => groups.set(category, [...(groups.get(category) || []), record]));
+    record.conditionCategories.forEach((category) => {
+      const groupedRecords = groups.get(category);
+      if (groupedRecords) groupedRecords.push(record);
+      else groups.set(category, [record]);
+    });
   });
   return Array.from(groups, ([name, groupedRecords]) => ({
     name,
@@ -292,9 +308,50 @@ function ChartApplicantModal({
   onClose: () => void;
   onView: (record: AssistanceRecord) => void;
 }) {
-  const sorted = [...group.records].sort(
-    (first, second) => (Date.parse(second.applicationDate || second.createdAt) || 0) - (Date.parse(first.applicationDate || first.createdAt) || 0),
+  const [query, setQuery] = useState("");
+  const [assistanceType, setAssistanceType] = useState("");
+  const [barangay, setBarangay] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const assistanceOptions = useMemo(
+    () => uniqueOptions(group.records.map((record) => record.assistanceType)),
+    [group.records],
   );
+  const barangayOptions = useMemo(
+    () => uniqueOptions(group.records.map((record) => record.brgy)),
+    [group.records],
+  );
+  const filtered = useMemo(() => {
+    const normalizedQuery = normalizeSearchText(query);
+    return group.records
+      .filter((record) => {
+        const applicationDate = (record.applicationDate || record.createdAt).slice(0, 10);
+        const searchable = normalizeSearchText([
+          applicantName(record),
+          record.birthday,
+          record.brgy,
+          record.assistanceType,
+          record.diagnosis,
+          record.remarks,
+        ].join(" "));
+        return (!normalizedQuery || searchable.includes(normalizedQuery)) &&
+          (!assistanceType || record.assistanceType === assistanceType) &&
+          (!barangay || record.brgy === barangay) &&
+          (!dateFrom || applicationDate >= dateFrom) &&
+          (!dateTo || applicationDate <= dateTo);
+      })
+      .sort(
+        (first, second) => (Date.parse(second.applicationDate || second.createdAt) || 0) - (Date.parse(first.applicationDate || first.createdAt) || 0),
+      );
+  }, [assistanceType, barangay, dateFrom, dateTo, group.records, query]);
+  const hasFilters = Boolean(query || assistanceType || barangay || dateFrom || dateTo);
+  const clearFilters = () => {
+    setQuery("");
+    setAssistanceType("");
+    setBarangay("");
+    setDateFrom("");
+    setDateTo("");
+  };
   return (
     <div className="modal active" role="dialog" aria-modal="true" aria-labelledby="chart-applicants-title">
       <div className="modal-content chart-applicant-modal">
@@ -305,12 +362,47 @@ function ChartApplicantModal({
           </div>
           <button className="close" type="button" onClick={onClose} aria-label="Close">&times;</button>
         </div>
+        <div className="chart-drilldown-filters">
+          <label className="chart-drilldown-search">
+            <span>Search this chart</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Name, birthday, barangay, diagnosis…"
+            />
+          </label>
+          <label>
+            <span>Assistance</span>
+            <select value={assistanceType} onChange={(event) => setAssistanceType(event.target.value)}>
+              <option value="">All types</option>
+              {assistanceOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Barangay</span>
+            <select value={barangay} onChange={(event) => setBarangay(event.target.value)}>
+              <option value="">All barangays</option>
+              {barangayOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>From</span>
+            <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          </label>
+          <label>
+            <span>To</span>
+            <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          </label>
+          {hasFilters && <button className="btn secondary small" type="button" onClick={clearFilters}>Clear filters</button>}
+        </div>
         <div className="chart-applicant-summary">
-          <strong>{sorted.length} application{sorted.length === 1 ? "" : "s"}</strong>
-          <span>Total granted: {money(sorted.reduce((sum, record) => sum + record.amount, 0))}</span>
+          <strong>{filtered.length} matching application{filtered.length === 1 ? "" : "s"}</strong>
+          <span>Total granted: {money(filtered.reduce((sum, record) => sum + record.amount, 0))}</span>
         </div>
         <div className="chart-applicant-list">
-          {sorted.map((record) => (
+          {!filtered.length && <div className="chart-applicant-empty">No applications match these filters.</div>}
+          {filtered.map((record) => (
             <article className="chart-applicant-row" key={record.id ?? `${record.applicationDate || record.createdAt}-${applicantName(record)}`}>
               <div>
                 <strong>{applicantName(record)}</strong>
@@ -339,6 +431,20 @@ function uniqueApplicants(records: AssistanceRecord[]) {
     if (!unique.has(key)) unique.set(key, record);
   });
   return Array.from(unique.values());
+}
+
+function uniqueOptions(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)))
+    .sort((first, second) => first.localeCompare(second));
+}
+
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("en-PH")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
 }
 
 function applicantName(record: AssistanceRecord) {

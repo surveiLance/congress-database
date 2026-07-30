@@ -28,10 +28,11 @@ export interface HouseholdSummary {
 export function householdSummaryForRecord(
   record: AssistanceRecord,
   allRecords: AssistanceRecord[],
+  historiesOverride?: Map<string, ApplicantHistory>,
 ): HouseholdSummary {
   const currentKey = applicantIdentityKey(record);
-  const currentHistory = buildApplicantHistories(allRecords).get(currentKey);
-  const histories = buildApplicantHistories(allRecords);
+  const histories = historiesOverride || buildApplicantHistories(allRecords);
+  const currentHistory = histories.get(currentKey);
   const currentApplications = currentHistory?.records || [record];
   const profileRecord: AssistanceRecord = {
     ...record,

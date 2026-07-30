@@ -111,8 +111,13 @@ h1 { color: #063f24; font-size: clamp(1.25rem, 2vw, 1.65rem); line-height: 1.2; 
 .applicant-chart-tooltip > span { margin-top: 3px; color: var(--text); }
 .applicant-chart-tooltip > small { color: var(--muted); }
 .chart-applicant-modal { max-width: 820px; }
+.chart-drilldown-filters { display: grid; grid-template-columns: minmax(220px, 1.6fr) repeat(4, minmax(110px, .75fr)) auto; align-items: end; gap: 9px; margin-bottom: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 9px; background: #f8fafc; }
+.chart-drilldown-filters label { display: grid; gap: 5px; min-width: 0; color: var(--muted); font-size: .7rem; font-weight: 800; }
+.chart-drilldown-filters input, .chart-drilldown-filters select { width: 100%; min-width: 0; height: 38px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; background: white; color: var(--text); font: inherit; font-weight: 500; }
+.chart-drilldown-filters .btn { height: 38px; white-space: nowrap; }
 .chart-applicant-summary { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid #bfdbfe; border-radius: 8px; background: #eff6ff; color: #1e40af; }
 .chart-applicant-list { display: grid; gap: 7px; max-height: 55vh; overflow-y: auto; }
+.chart-applicant-empty { padding: 28px 16px; border: 1px dashed var(--border); border-radius: 8px; color: var(--muted); text-align: center; }
 .chart-applicant-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(150px, .8fr) auto; align-items: center; gap: 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: white; }
 .chart-applicant-row > div { display: grid; }
 .chart-applicant-row span { color: var(--muted); font-size: .72rem; }
@@ -601,6 +606,9 @@ textarea { resize: vertical; }
   .dashboard-heading .btn { justify-content: center; }
   .chart-card-heading { align-items: flex-start; flex-direction: column; gap: 2px; }
   .chart-applicant-summary { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .chart-drilldown-filters { grid-template-columns: 1fr 1fr; }
+  .chart-drilldown-search { grid-column: 1 / -1; }
+  .chart-drilldown-filters .btn { grid-column: 1 / -1; }
   .chart-applicant-row { grid-template-columns: 1fr auto; }
   .chart-applicant-row > div:nth-child(2) { justify-items: end; }
   .chart-applicant-row .btn { grid-column: 1 / -1; justify-content: center; }

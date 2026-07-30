@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { applicantIdentityKey, buildApplicantHistories, formatPeso } from "@/lib/applicantIdentity";
 import { householdSummaryForRecord } from "@/lib/householdMatching";
 import { AssistanceRecord } from "@/lib/types";
@@ -29,7 +30,7 @@ export default function RecordTable({
   onToggleSelected,
   onToggleAll,
 }: Props) {
-  const histories = buildApplicantHistories(allRecords);
+  const histories = useMemo(() => buildApplicantHistories(allRecords), [allRecords]);
   const selectableIds = records.flatMap((record) => record.id === undefined ? [] : [record.id]);
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
   return (
@@ -53,7 +54,7 @@ export default function RecordTable({
           {!records.length && <tr><td colSpan={onToggleSelected ? 9 : 8} className="empty">No records found.</td></tr>}
           {records.map((record) => {
             const history = histories.get(applicantIdentityKey(record));
-            const household = householdSummaryForRecord(record, allRecords);
+            const household = householdSummaryForRecord(record, allRecords, histories);
             const selected = record.id !== undefined && selectedIds.has(record.id);
             return (
             <tr className={selected ? "selected-record-row" : ""} key={record.id}>

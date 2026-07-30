@@ -427,7 +427,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
             <DocumentScanner records={activeRecords} onView={setSelected} onAttachDocument={attachMatchedDocument} />
         </div>
 
-        <div className="workspace-view" hidden={workspace !== "reports"}>
+        {workspace === "reports" && <div className="workspace-view">
             <section className="workspace-intro compact">
               <div>
                 <span className="eyebrow">District Summary</span>
@@ -436,7 +436,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               </div>
             </section>
             <Dashboard records={filtered} onView={setSelected} />
-        </div>
+        </div>}
 
         <div className="workspace-view" hidden={workspace !== "utilities"}>
             <section className="workspace-intro compact">
