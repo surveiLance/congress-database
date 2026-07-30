@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ChangeEvent, FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import {
   ApplicantHistory,
   applicantIdentityKey,
@@ -11,6 +11,12 @@ import {
   standardizeApplicantText,
 } from "@/lib/applicantIdentity";
 import { conditionCategories } from "@/lib/conditionCategories";
+import {
+  ApplicationDraft,
+  deleteApplicationDraft,
+  getApplicationDraft,
+  saveApplicationDraft,
+} from "@/lib/draftStore";
 import { householdSummaryForRecord } from "@/lib/householdMatching";
 import { AssistanceRecord, emptyRecord, FamilyMember } from "@/lib/types";
 
@@ -23,6 +29,7 @@ interface Props {
 }
 
 const barangays = ["Dela Paz", "San Isidro", "Sta.cruz", "Bagong Nayon", "Mambugan", "Mayamot", "Beverly Hills", "Muntindilaw"];
+const NEW_APPLICATION_DRAFT_KEY = "new-application";
 
 function ageFromBirthday(value: string) {
   if (!value) return "";
@@ -40,6 +47,11 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [copiedApplicantKey, setCopiedApplicantKey] = useState("");
+  const [draftCandidate, setDraftCandidate] = useState<ApplicationDraft | null>(null);
+  const [draftReady, setDraftReady] = useState(Boolean(initialRecord));
+  const [draftSavedAt, setDraftSavedAt] = useState("");
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftError, setDraftError] = useState("");
 
   const currentApplicantKey = applicantIdentityKey({
     surname: form.surname,
@@ -77,6 +89,45 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
     const summary = householdSummaryForRecord(form, existingRecords);
     return summary.connections.length ? summary : null;
   }, [existingRecords, form]);
+
+  useEffect(() => {
+    if (initialRecord) return;
+    let active = true;
+    void getApplicationDraft(NEW_APPLICATION_DRAFT_KEY)
+      .then((draft) => {
+        if (!active) return;
+        setDraftCandidate(draft);
+        if (draft) {
+          setForm({ ...draft.record, id: undefined, createdAt: "", updatedAt: "", archivedAt: "" });
+        }
+        setDraftSavedAt(draft?.savedAt || "");
+        setDraftReady(true);
+      })
+      .catch((reason) => {
+        console.error(reason);
+        if (active) {
+          setDraftError("Draft storage could not be opened in this browser.");
+          setDraftReady(true);
+        }
+      });
+    return () => { active = false; };
+  }, [initialRecord]);
+
+  useEffect(() => {
+    if (initialRecord || !draftReady || !hasDraftContent(form)) return;
+    const timeout = window.setTimeout(() => {
+      void saveApplicationDraft(NEW_APPLICATION_DRAFT_KEY, form)
+        .then((draft) => {
+          setDraftSavedAt(draft.savedAt);
+          setDraftError("");
+        })
+        .catch((reason) => {
+          console.error(reason);
+          setDraftError("Automatic draft saving failed. Use Save Draft & Close to try again.");
+        });
+    }, 500);
+    return () => window.clearTimeout(timeout);
+  }, [draftReady, form, initialRecord]);
 
   if (!open) return null;
 
@@ -168,6 +219,34 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
     reader.readAsDataURL(file);
   };
 
+  const discardDraft = async () => {
+    try {
+      await deleteApplicationDraft(NEW_APPLICATION_DRAFT_KEY);
+      setDraftCandidate(null);
+      setDraftSavedAt("");
+      setForm({ ...emptyRecord });
+      setDraftError("");
+    } catch (reason) {
+      console.error(reason);
+      setDraftError("The saved draft could not be discarded.");
+    }
+  };
+
+  const saveDraftAndClose = async () => {
+    if (initialRecord || !hasDraftContent(form)) return;
+    setSavingDraft(true);
+    setDraftError("");
+    try {
+      await saveApplicationDraft(NEW_APPLICATION_DRAFT_KEY, form);
+      onClose();
+    } catch (reason) {
+      console.error(reason);
+      setDraftError("The draft could not be saved. Please try again before closing.");
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setSaving(true);
@@ -180,6 +259,13 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
         createdAt: initialRecord?.createdAt || now,
         updatedAt: now,
       }));
+      if (!initialRecord) {
+        try {
+          await deleteApplicationDraft(NEW_APPLICATION_DRAFT_KEY);
+        } catch (reason) {
+          console.error("The completed application was saved, but its local draft could not be removed.", reason);
+        }
+      }
       setForm({ ...emptyRecord });
       onClose();
     } catch (error) {
@@ -189,7 +275,16 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
     }
   };
 
-  const close = () => {
+  const close = async () => {
+    if (!initialRecord && hasDraftContent(form)) {
+      try {
+        await saveApplicationDraft(NEW_APPLICATION_DRAFT_KEY, form);
+      } catch (reason) {
+        console.error(reason);
+        setDraftError("The draft could not be saved. Use Save Draft & Close to try again.");
+        return;
+      }
+    }
     setForm({ ...emptyRecord });
     onClose();
   };
@@ -199,7 +294,7 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
       <div className="modal-content record-form-modal">
         <div className="modal-header">
           <h2 id="record-form-title">{initialRecord ? "Edit Assistance Record" : "New Assistance Record"}</h2>
-          <button className="close" type="button" onClick={close} aria-label="Close">&times;</button>
+          <button className="close" type="button" onClick={() => void close()} aria-label="Close">&times;</button>
         </div>
         <form onSubmit={submit}>
           <div className="record-form-layout">
@@ -264,6 +359,19 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                 </div>
               )}
               {saveError && <div className="notice error" role="alert">{saveError}</div>}
+              {draftError && <div className="notice error" role="alert">{draftError}</div>}
+              {!initialRecord && draftCandidate && (
+                <div className="draft-recovery-alert" role="status">
+                  <div>
+                    <span className="eyebrow">Saved application draft</span>
+                    <strong>Your unfinished application was restored automatically.</strong>
+                    <small>Last saved locally on this device {formatDraftTime(draftCandidate.savedAt)}.</small>
+                  </div>
+                  <div>
+                    <button className="btn secondary small" type="button" onClick={() => void discardDraft()}>Discard and Start New</button>
+                  </div>
+                </div>
+              )}
               <div className="form-grid">
                 <h3 className="section-title">1. Name Details</h3>
                 <Field label="Surname *"><input autoFocus required value={form.surname} onChange={(e) => update("surname", e.target.value)} /></Field>
@@ -435,7 +543,22 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
             </aside>
           </div>
           <div className="modal-footer">
-            <button type="button" className="btn secondary" onClick={close}>Cancel</button>
+            {!initialRecord && (
+              <span className="draft-save-status">
+                {draftSavedAt ? `Draft saved locally ${formatDraftTime(draftSavedAt)}` : "Progress saves locally as you type"}
+              </span>
+            )}
+            <button type="button" className="btn secondary" onClick={() => void close()}>Close</button>
+            {!initialRecord && (
+              <button
+                type="button"
+                className="btn secondary"
+                disabled={savingDraft || !hasDraftContent(form)}
+                onClick={() => void saveDraftAndClose()}
+              >
+                {savingDraft ? "Saving Draft…" : "Save Draft & Close"}
+              </button>
+            )}
             <button type="submit" className="btn" disabled={saving}>{saving ? "Saving..." : initialRecord ? "Save Changes" : "Save Record"}</button>
           </div>
         </form>
@@ -451,6 +574,33 @@ function selectInitialZero(event: React.FocusEvent<HTMLInputElement>) {
 function formatApplicantBirthday(value: string) {
   const parsed = new Date(`${value}T00:00:00`);
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString("en-PH");
+}
+
+function formatDraftTime(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("en-PH", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function hasDraftContent(record: AssistanceRecord) {
+  return Boolean(
+    record.surname.trim() ||
+    record.firstName.trim() ||
+    record.contact.trim() ||
+    record.address.trim() ||
+    record.birthday ||
+    record.brgy ||
+    record.assistanceType ||
+    record.amountRequested ||
+    record.amount ||
+    record.remarks.trim() ||
+    record.idImage ||
+    record.familyComposition.some((member) => member.fullName.trim()),
+  );
 }
 
 function Field({ label, full = false, children }: { label: string; full?: boolean; children: React.ReactNode }) {
