@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useState } from "react";
+import { ChangeEvent, DragEvent as ReactDragEvent, useState } from "react";
 import Image from "next/image";
 import { confidentMatchThreshold, ScoredRecordMatch, scoreDocumentMatches } from "@/lib/scoredMatching";
 import { householdSummaryForRecord } from "@/lib/householdMatching";
@@ -22,10 +22,14 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
   const [confirmedId, setConfirmedId] = useState<number | null>(null);
   const [attaching, setAttaching] = useState(false);
   const [attached, setAttached] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
-  const scan = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const scanFile = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setText("Please upload or drop an image file.");
+      setMatches([]);
+      return;
+    }
     if (preview) URL.revokeObjectURL(preview);
     setPreview(URL.createObjectURL(file));
     setImageData(await fileToDataUrl(file));
@@ -51,6 +55,18 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
     }
   };
 
+  const scan = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) void scanFile(file);
+  };
+
+  const documentDropped = (event: ReactDragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDragOver(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file) void scanFile(file);
+  };
+
   const confident = Boolean(matches?.length && matches[0].percentage >= confidentMatchThreshold);
   const possible = Boolean(matches?.length);
   const topMatch = matches?.[0] || null;
@@ -72,7 +88,17 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
       <section className="scanner-card">
         <div className="scanner-header"><h3>Document / ID Matching</h3>{busy && <span>Reading document…</span>}</div>
         <div className="scanner-body">
-          <div className="scanner-upload">
+          <div
+            className={`scanner-upload scanner-drop-zone${dragOver ? " drag-over" : ""}`}
+            onDragEnter={(event) => { event.preventDefault(); setDragOver(true); }}
+            onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={documentDropped}
+          >
+            <div className="scanner-drop-hint">
+              <strong>Drop an ID or document image here</strong>
+              <span>or use the upload button</span>
+            </div>
             <label className="btn secondary file-button">Upload ID or Document<input type="file" accept="image/*" capture="environment" onChange={scan} /></label>
             {preview && <Image unoptimized src={preview} width={800} height={500} className="scan-preview" alt="Document preview" />}
           </div>

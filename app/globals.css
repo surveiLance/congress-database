@@ -214,6 +214,12 @@ h1 { color: #063f24; font-size: clamp(1.25rem, 2vw, 1.65rem); line-height: 1.2; 
 .scanner-header span { color: var(--primary); font-weight: 600; }
 .scanner-body { display: grid; grid-template-columns: minmax(280px, .85fr) minmax(0, 1.35fr); align-items: start; gap: 16px; }
 .scanner-upload, .scanner-review { min-width: 0; }
+.scanner-drop-zone { display: grid; gap: 9px; padding: 12px; border: 2px dashed #a9dabb; border-radius: var(--radius); background: #f7fcf9; transition: border-color .15s ease, background .15s ease, box-shadow .15s ease; }
+.scanner-drop-zone.drag-over { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 4px #2563eb1f; }
+.scanner-drop-hint { display: grid; place-items: center; gap: 1px; padding: 9px; color: var(--muted); text-align: center; pointer-events: none; }
+.scanner-drop-hint strong { color: var(--text); font-size: .8rem; }
+.scanner-drop-hint span { font-size: .7rem; }
+.scanner-drop-zone .file-button { justify-self: center; }
 .scanner-review { display: grid; gap: 10px; }
 .file-button input { display: none; }
 .scan-preview { display: block; width: 100%; height: auto; max-height: 250px; margin-top: 10px; border: 1px solid var(--border); border-radius: var(--radius); background: #f8fafc; object-fit: contain; }
@@ -340,6 +346,9 @@ tr:hover { background: #f8fafc; }
 .record-photo-reference > div:first-child p { color: var(--muted); font-size: .78rem; }
 .record-photo-frame { display: grid; min-height: 300px; place-items: center; overflow: hidden; border: 2px dashed #86c99e; border-radius: var(--radius); background: white; }
 .record-photo-frame.compact { min-height: 155px; }
+.photo-drop-zone { transition: border-color .15s ease, background .15s ease, box-shadow .15s ease; }
+.photo-drop-zone.drag-over { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 4px #2563eb1f; }
+.photo-drop-zone.drag-over .record-photo-empty strong { color: #1d4ed8; }
 .record-photo-frame.has-image { border-style: solid; }
 .record-photo-frame img { display: block; width: 100%; height: auto; max-height: 52vh; object-fit: contain; }
 .record-photo-frame.compact img { max-height: 230px; }

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent as ReactDragEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import {
   ApplicantHistory,
   applicantIdentityKey,
@@ -63,6 +63,7 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
   const [draftSavedAt, setDraftSavedAt] = useState("");
   const [savingDraft, setSavingDraft] = useState(false);
   const [draftError, setDraftError] = useState("");
+  const [dragTarget, setDragTarget] = useState<"idImage" | "idImageBack" | null>(null);
 
   const currentApplicantKey = applicantIdentityKey({
     surname: form.surname,
@@ -222,12 +223,26 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
     }));
   };
 
-  const fileChanged = (field: "idImage" | "idImageBack") => (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const loadPhoto = (field: "idImage" | "idImageBack", file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setDraftError("Please use an image file for the ID photo.");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => update(field, String(reader.result));
     reader.readAsDataURL(file);
+  };
+
+  const fileChanged = (field: "idImage" | "idImageBack") => (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) loadPhoto(field, file);
+  };
+
+  const photoDropped = (field: "idImage" | "idImageBack") => (event: ReactDragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDragTarget(null);
+    const file = event.dataTransfer.files?.[0];
+    if (file) loadPhoto(field, file);
   };
 
   const discardDraft = async () => {
@@ -548,10 +563,16 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                   <strong>ID Front</strong>
                   {form.idImage && <button type="button" onClick={() => update("idImage", null)}>Remove</button>}
                 </div>
-                <div className={`record-photo-frame compact${form.idImage ? " has-image" : ""}`}>
+                <div
+                  className={`record-photo-frame compact photo-drop-zone${form.idImage ? " has-image" : ""}${dragTarget === "idImage" ? " drag-over" : ""}`}
+                  onDragEnter={(event) => { event.preventDefault(); setDragTarget("idImage"); }}
+                  onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setDragTarget("idImage"); }}
+                  onDragLeave={() => setDragTarget(null)}
+                  onDrop={photoDropped("idImage")}
+                >
                   {form.idImage
                     ? <Image unoptimized src={form.idImage} width={1000} height={650} alt="Front of attached ID" />
-                    : <div className="record-photo-empty"><strong>Front photo</strong><span>Place the name and photo side clearly in frame.</span></div>}
+                    : <div className="record-photo-empty"><strong>Drop ID front here</strong><span>Or take/upload a clear photo using the button below.</span></div>}
                 </div>
                 <label className="btn secondary record-photo-button">
                   {form.idImage ? "Replace Front" : "Take or Upload Front"}
@@ -563,10 +584,16 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                   <strong>ID Back</strong>
                   {form.idImageBack && <button type="button" onClick={() => update("idImageBack", null)}>Remove</button>}
                 </div>
-                <div className={`record-photo-frame compact${form.idImageBack ? " has-image" : ""}`}>
+                <div
+                  className={`record-photo-frame compact photo-drop-zone${form.idImageBack ? " has-image" : ""}${dragTarget === "idImageBack" ? " drag-over" : ""}`}
+                  onDragEnter={(event) => { event.preventDefault(); setDragTarget("idImageBack"); }}
+                  onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setDragTarget("idImageBack"); }}
+                  onDragLeave={() => setDragTarget(null)}
+                  onDrop={photoDropped("idImageBack")}
+                >
                   {form.idImageBack
                     ? <Image unoptimized src={form.idImageBack} width={1000} height={650} alt="Back of attached ID" />
-                    : <div className="record-photo-empty"><strong>Back photo</strong><span>Capture the complete reverse side of the ID.</span></div>}
+                    : <div className="record-photo-empty"><strong>Drop ID back here</strong><span>Or take/upload the reverse side using the button below.</span></div>}
                 </div>
                 <label className="btn secondary record-photo-button">
                   {form.idImageBack ? "Replace Back" : "Take or Upload Back"}
