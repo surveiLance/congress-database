@@ -13,6 +13,7 @@ import { ExcelImportSummary, parseMaipExcelImport } from "@/lib/excelImport";
 import { addRecords, updateRecord, usesSharedDatabase } from "@/lib/recordStore";
 
 type ImportFormat = "JSON" | "CSV" | "Excel";
+type PreviewFilter = "all" | "ready" | "duplicate" | "failed";
 
 interface ImportResult {
   imported: number;
@@ -31,6 +32,7 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState("");
   const [excelSummary, setExcelSummary] = useState<ExcelImportSummary | null>(null);
+  const [previewFilter, setPreviewFilter] = useState<PreviewFilter>("all");
   const [result, setResult] = useState<ImportResult | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -60,7 +62,9 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
       setFormat(selectedFormat);
       setFileName(file.name);
       setExcelSummary(parsedExcel?.summary || null);
-      setPreview(createImportPreview(rows, records));
+      const nextPreview = createImportPreview(rows, records);
+      setPreview(nextPreview);
+      setPreviewFilter(nextPreview.some((row) => row.status === "failed") ? "failed" : "all");
     } catch (error) {
       setPreview(null);
       setExcelSummary(null);
@@ -127,6 +131,7 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
     setOverwrite(false);
     setExcelSummary(null);
     setProgress("");
+    setPreviewFilter("all");
   };
 
   const counts = preview ? {
@@ -134,6 +139,9 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
     duplicate: preview.filter((row) => row.status === "duplicate").length,
     failed: preview.filter((row) => row.status === "failed").length,
   } : null;
+  const filteredPreview = previewFilter === "all"
+    ? preview || []
+    : (preview || []).filter((row) => row.status === previewFilter);
 
   return (
     <>
@@ -164,9 +172,10 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
             </div>
 
             <div className="import-counts" aria-label="Preview counts">
-              <span className="count ready">{counts.ready} ready</span>
-              <span className="count duplicate">{counts.duplicate} duplicate</span>
-              <span className="count failed">{counts.failed} failed</span>
+              <button className={`count ready${previewFilter === "ready" ? " active" : ""}`} type="button" onClick={() => setPreviewFilter(previewFilter === "ready" ? "all" : "ready")}>{counts.ready} ready</button>
+              <button className={`count duplicate${previewFilter === "duplicate" ? " active" : ""}`} type="button" onClick={() => setPreviewFilter(previewFilter === "duplicate" ? "all" : "duplicate")}>{counts.duplicate} duplicate</button>
+              <button className={`count failed${previewFilter === "failed" ? " active" : ""}`} type="button" onClick={() => setPreviewFilter(previewFilter === "failed" ? "all" : "failed")}>{counts.failed} failed</button>
+              <span className="import-count-help">Select a count to show only those rows.</span>
             </div>
             {excelSummary && (
               <div className="excel-import-summary">
@@ -182,7 +191,7 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
               <table>
                 <thead><tr><th>Row</th><th>Applicant</th><th>Application Date</th><th>Assistance</th><th>Amount</th><th>Status</th><th>Details</th></tr></thead>
                 <tbody>
-                  {preview.slice(0, 150).map((row) => (
+                  {filteredPreview.slice(0, 150).map((row) => (
                     <tr key={row.rowNumber}>
                       <td>{row.rowNumber}</td>
                       <td>{row.record ? `${row.record.surname}, ${row.record.firstName} ${row.record.middleName}`.trim() : "Invalid row"}</td>
@@ -196,7 +205,8 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
                 </tbody>
               </table>
             </div>
-            {preview.length > 150 && <p className="import-preview-limit">Showing the first 150 rows for a responsive preview. All {preview.length.toLocaleString()} rows are included in the counts and import.</p>}
+            {!filteredPreview.length && <p className="import-preview-limit">No {previewFilter === "all" ? "" : `${previewFilter} `}rows to display.</p>}
+            {filteredPreview.length > 150 && <p className="import-preview-limit">Showing the first 150 of {filteredPreview.length.toLocaleString()} {previewFilter === "all" ? "preview" : previewFilter} rows. All {preview.length.toLocaleString()} rows remain included in the counts and import.</p>}
 
             {counts.duplicate > 0 && (
               <label className="overwrite-option">

@@ -49,6 +49,12 @@ export function createImportPreview(
   existingRecords: AssistanceRecord[],
 ): ImportPreviewRow[] {
   const existing = new Map(existingRecords.map((record) => [duplicateKey(record), record]));
+  const existingSources = new Map(
+    existingRecords.flatMap((record) => {
+      const sourceKey = legacySourceKey(record);
+      return sourceKey ? [[sourceKey, record] as const] : [];
+    }),
+  );
   const seenInFile = new Set<string>();
 
   return sourceRows.map((source, index) => {
@@ -71,7 +77,7 @@ export function createImportPreview(
     }
     seenInFile.add(key);
 
-    const existingMatch = existing.get(key);
+    const existingMatch = existing.get(key) || existingSources.get(legacySourceKey(result.record));
     if (existingMatch) {
       return {
         rowNumber,
@@ -109,10 +115,20 @@ function validateRecord(source: unknown): { record: AssistanceRecord | null; err
   const birthday = String(raw.birthday || "");
   if (birthday && !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) {
     errors.push("Birthday must use YYYY-MM-DD format.");
+  } else if (birthday && !isRealIsoDate(birthday)) {
+    errors.push("Birthday is not a real calendar date.");
   }
   const applicationDate = String(raw.applicationDate || "");
   if (applicationDate && !/^\d{4}-\d{2}-\d{2}$/.test(applicationDate)) {
     errors.push("Application date must use YYYY-MM-DD format.");
+  } else if (applicationDate && !isRealIsoDate(applicationDate)) {
+    errors.push("Application date is not a real calendar date.");
+  }
+  const beneficiaryBirthday = String(raw.benBday || "");
+  if (beneficiaryBirthday && !/^\d{4}-\d{2}-\d{2}$/.test(beneficiaryBirthday)) {
+    errors.push("Beneficiary birthday must use YYYY-MM-DD format.");
+  } else if (beneficiaryBirthday && !isRealIsoDate(beneficiaryBirthday)) {
+    errors.push("Beneficiary birthday is not a real calendar date.");
   }
 
   if (errors.length) return { record: null, errors };
@@ -128,6 +144,20 @@ function validateRecord(source: unknown): { record: AssistanceRecord | null; err
   const record = normalizeRecord(partial);
   if (!record.createdAt) record.createdAt = new Date().toISOString();
   return { record, errors: [] };
+}
+
+function legacySourceKey(record: Partial<AssistanceRecord>): string {
+  const source = record.legacyApplication;
+  if (!source?.sourceFile || !source.sourceRow) return "";
+  return `${source.sourceFile.trim().toLocaleLowerCase("en-PH")}|${source.sourceRow}`;
+}
+
+function isRealIsoDate(value: string): boolean {
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day;
 }
 
 export function parseJsonImport(text: string): unknown[] {

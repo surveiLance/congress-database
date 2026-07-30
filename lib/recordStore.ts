@@ -83,8 +83,20 @@ export async function addRecords(
       updated_by: user.id,
     })));
     if (error) {
-      console.error("Bulk import batch failed:", error);
-      failed += batch.length;
+      console.error("Bulk import batch failed; retrying its records individually:", error);
+      for (const record of batch) {
+        const { error: rowError } = await client.from("assistance_records").insert({
+          ...toSharedPayload(record),
+          created_by: user.id,
+          updated_by: user.id,
+        });
+        if (rowError) {
+          console.error(`Import failed for ${record.surname}, ${record.firstName}:`, rowError);
+          failed += 1;
+        } else {
+          imported += 1;
+        }
+      }
     } else {
       imported += batch.length;
     }
