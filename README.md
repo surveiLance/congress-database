@@ -48,6 +48,8 @@ Active records can be edited or archived. Archived records are excluded from act
 
 New applications automatically save an unfinished local draft in browser IndexedDB. Closing the form, refreshing, or reopening the site restores that draft without adding it to completed records or the shared Supabase database. Staff can explicitly use **Save Draft & Close** or discard the restored draft and start a new application.
 
+Application records and drafts support separate front and back ID photos. Older records with the original single image remain compatible and display that image as the ID front.
+
 ## Applicant assistance history
 
 Every assistance request remains a separate application, while surname, first name, and birthday are normalized to identify the same applicant despite capitalization, punctuation, spacing, or common date-format differences. The encoding form warns staff about prior applications and shows the amount previously granted. The records table and full history view show each application alongside the applicant's cumulative assistance total. New and imported applicant names are standardized to uppercase for consistent display.

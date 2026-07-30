@@ -8,7 +8,7 @@ export const recordFields: (keyof AssistanceRecord)[] = [
   "totalEmployed", "monthlyExpenses", "civilStatus", "category",
   "assistanceType", "amountRequested", "amount", "relationship", "benName", "benBday", "benAge",
   "benSex", "benFamilyMember", "benCivilStatus", "benCategory", "diagnosis",
-  "conditionCategories", "conditionOther", "remarks", "idImage", "createdAt",
+  "conditionCategories", "conditionOther", "remarks", "idImage", "idImageBack", "createdAt",
   "updatedAt", "archivedAt",
 ];
 

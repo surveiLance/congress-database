@@ -222,11 +222,11 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
     }));
   };
 
-  const fileChanged = (event: ChangeEvent<HTMLInputElement>) => {
+  const fileChanged = (field: "idImage" | "idImageBack") => (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => update("idImage", String(reader.result));
+    reader.onload = () => update(field, String(reader.result));
     reader.readAsDataURL(file);
   };
 
@@ -539,21 +539,41 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
 
             <aside className="record-photo-reference" aria-labelledby="application-photo-title">
               <div>
-                <span className="eyebrow">Reference Only</span>
-                <h3 id="application-photo-title">Application Photo</h3>
-                <p>Keep the document visible while typing. No automatic extraction is performed.</p>
+                <span className="eyebrow">Identity Reference</span>
+                <h3 id="application-photo-title">ID Front & Back</h3>
+                <p>Take clear photos of both sides. Existing records with one photo remain valid.</p>
               </div>
-              <div className={`record-photo-frame${form.idImage ? " has-image" : ""}`}>
-                {form.idImage
-                  ? <Image unoptimized src={form.idImage} width={1000} height={1300} alt="Application document reference" />
-                  : <div className="record-photo-empty"><strong>No photo attached</strong><span>Use a clear, upright photo of the complete document.</span></div>}
+              <div className="record-photo-slot">
+                <div className="record-photo-slot-heading">
+                  <strong>ID Front</strong>
+                  {form.idImage && <button type="button" onClick={() => update("idImage", null)}>Remove</button>}
+                </div>
+                <div className={`record-photo-frame compact${form.idImage ? " has-image" : ""}`}>
+                  {form.idImage
+                    ? <Image unoptimized src={form.idImage} width={1000} height={650} alt="Front of attached ID" />
+                    : <div className="record-photo-empty"><strong>Front photo</strong><span>Place the name and photo side clearly in frame.</span></div>}
+                </div>
+                <label className="btn secondary record-photo-button">
+                  {form.idImage ? "Replace Front" : "Take or Upload Front"}
+                  <input type="file" accept="image/*" capture="environment" onChange={fileChanged("idImage")} />
+                </label>
               </div>
-              <label className="btn secondary record-photo-button">
-                {form.idImage ? "Replace Photo" : "Take or Upload Photo"}
-                <input type="file" accept="image/*" capture="environment" onChange={fileChanged} />
-              </label>
-              {form.idImage && <button className="btn secondary small" type="button" onClick={() => update("idImage", null)}>Remove Photo</button>}
-              <p className="record-photo-note">The image is saved with this application only after you click Save Record.</p>
+              <div className="record-photo-slot">
+                <div className="record-photo-slot-heading">
+                  <strong>ID Back</strong>
+                  {form.idImageBack && <button type="button" onClick={() => update("idImageBack", null)}>Remove</button>}
+                </div>
+                <div className={`record-photo-frame compact${form.idImageBack ? " has-image" : ""}`}>
+                  {form.idImageBack
+                    ? <Image unoptimized src={form.idImageBack} width={1000} height={650} alt="Back of attached ID" />
+                    : <div className="record-photo-empty"><strong>Back photo</strong><span>Capture the complete reverse side of the ID.</span></div>}
+                </div>
+                <label className="btn secondary record-photo-button">
+                  {form.idImageBack ? "Replace Back" : "Take or Upload Back"}
+                  <input type="file" accept="image/*" capture="environment" onChange={fileChanged("idImageBack")} />
+                </label>
+              </div>
+              <p className="record-photo-note">Both photos stay in the local draft and are added to the record only after Save Record.</p>
             </aside>
           </div>
           <div className="modal-footer">
@@ -613,6 +633,7 @@ function hasDraftContent(record: AssistanceRecord) {
     record.amount ||
     record.remarks.trim() ||
     record.idImage ||
+    record.idImageBack ||
     record.familyComposition.some((member) => member.fullName.trim()),
   );
 }

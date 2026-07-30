@@ -88,8 +88,23 @@ export default function ViewRecordModal({
           ...(record.conditionOther ? [["Other Condition", record.conditionOther]] : []),
           ["Remarks", record.remarks || "None"],
         ]} />
-        <h3 className="section-title">5. Attached ID Photo</h3>
-        {record.idImage ? <Image unoptimized src={record.idImage} width={800} height={500} className="id-image-preview" alt="Attached valid ID" /> : <p className="muted">No ID attached for this record.</p>}
+        <h3 className="section-title">5. Attached ID Photos</h3>
+        {record.idImage || record.idImageBack ? (
+          <div className="id-image-grid">
+            {record.idImage && (
+              <figure>
+                <figcaption>ID Front</figcaption>
+                <Image unoptimized src={record.idImage} width={800} height={500} className="id-image-preview" alt="Front of attached ID" />
+              </figure>
+            )}
+            {record.idImageBack && (
+              <figure>
+                <figcaption>ID Back</figcaption>
+                <Image unoptimized src={record.idImageBack} width={800} height={500} className="id-image-preview" alt="Back of attached ID" />
+              </figure>
+            )}
+          </div>
+        ) : <p className="muted">No ID photos attached for this record.</p>}
         <div className="modal-footer"><button className="btn secondary" onClick={onClose}>Close</button></div>
       </div>
     </div>

@@ -46,6 +46,7 @@ export interface AssistanceRecord {
   conditionOther: string;
   remarks: string;
   idImage: string | null;
+  idImageBack: string | null;
   createdAt: string;
   updatedAt?: string;
   archivedAt?: string;
@@ -59,7 +60,7 @@ export const emptyRecord: AssistanceRecord = {
   civilStatus: "", category: "", assistanceType: "", amountRequested: 0, amount: 0, relationship: "",
   benName: "", benBday: "", benAge: "", benSex: "", benFamilyMember: "",
   benCivilStatus: "", benCategory: "", diagnosis: "", conditionCategories: [],
-  conditionOther: "", remarks: "", idImage: null,
+  conditionOther: "", remarks: "", idImage: null, idImageBack: null,
   createdAt: "",
   updatedAt: "",
   archivedAt: "",
@@ -82,6 +83,7 @@ export function normalizeRecord(record: Partial<AssistanceRecord>): AssistanceRe
     conditionOther: record.conditionOther || "",
     idNumber: record.idNumber || "",
     idImage: record.idImage || null,
+    idImageBack: record.idImageBack || null,
     createdAt: record.createdAt || new Date().toISOString(),
     updatedAt: record.updatedAt || record.createdAt || "",
     archivedAt: record.archivedAt || "",

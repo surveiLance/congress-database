@@ -247,6 +247,7 @@ export default function ApplicationDocumentEncoder({ onSave }: { onSave: (record
         householdMembers: Number(values.householdMembers) || 0,
         totalEmployed: Number(values.householdEmployed) || 0,
         idImage: imageData,
+        idImageBack: null,
         createdAt: now,
         updatedAt: now,
       });
