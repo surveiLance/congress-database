@@ -43,17 +43,24 @@ export default function ViewRecordModal({
         <HouseholdConnections record={record} allRecords={allRecords} onView={onView} onUpdate={onUpdate} />
         <h3 className="section-title">Application History</h3>
         <div className="application-history-list">
-          {applications.map((application) => (
-            <article className={`application-history-item${application.id === record.id ? " selected" : ""}`} key={application.id}>
+          {applications.map((application, index) => (
+            <button
+              className={`application-history-item${application.id === record.id ? " selected" : ""}`}
+              type="button"
+              key={application.id ?? `${application.createdAt}-${index}`}
+              onClick={() => onView?.(application)}
+              aria-current={application.id === record.id ? "true" : undefined}
+              title={application.id === record.id ? "Currently displayed application" : "Show this application's details"}
+            >
               <div>
                 <strong>{formatTimestamp(application.applicationDate || application.createdAt, true)}</strong>
                 <span>{application.assistanceType || "Unspecified assistance"}</span>
               </div>
               <strong>{formatPeso(application.amount)}</strong>
               <span className={`history-status${application.archivedAt ? " archived" : ""}`}>
-                {application.id === record.id ? "Selected" : application.archivedAt ? "Archived" : "Recorded"}
+                {application.id === record.id ? "Selected" : application.archivedAt ? "Archived · View" : "View details →"}
               </span>
-            </article>
+            </button>
           ))}
         </div>
         <p className="selected-application-label">Selected application details</p>
