@@ -100,23 +100,46 @@ function scoreHouseholdConnection(
     reasons.push("Applicant is listed in their family composition");
   }
 
-  const sameSurname = usableSurname(record.surname) &&
-    usableSurname(record.surname) === usableSurname(applicant.surname);
-  if (sameSurname) {
-    score += 48;
-    reasons.push("Same surname");
+  const recordSurname = usableNamePart(record.surname);
+  const applicantSurname = usableNamePart(applicant.surname);
+  const recordMiddleName = usableMiddleName(record.middleName);
+  const applicantMiddleName = usableMiddleName(applicant.middleName);
+  const sameSurname = Boolean(recordSurname && recordSurname === applicantSurname);
+  const sameMiddleName = Boolean(recordMiddleName && recordMiddleName === applicantMiddleName);
+  const surnameMiddleLink = Boolean(
+    (recordSurname && recordSurname === applicantMiddleName) ||
+    (applicantSurname && applicantSurname === recordMiddleName),
+  );
+
+  if (sameSurname && sameMiddleName) {
+    score += 72;
+    reasons.push("Same surname and middle name");
+  } else {
+    if (sameSurname) {
+      score += 28;
+      reasons.push("Same surname");
+    }
+    if (sameMiddleName) {
+      score += 32;
+      reasons.push("Same middle name");
+    }
+  }
+  if (surnameMiddleLink) {
+    score += 54;
+    reasons.push("Surname matches the other applicant's middle name");
   }
 
   const sameAddress = normalizedAddress(record.address) &&
     normalizedAddress(record.address) === normalizedAddress(applicant.address);
-  if (sameAddress && (sameSurname || declaredMember || reverseMember)) {
+  const hasNameLink = sameSurname || sameMiddleName || surnameMiddleLink;
+  if (sameAddress && (hasNameLink || declaredMember || reverseMember)) {
     score += 24;
     reasons.push("Same recorded address");
   }
 
   const sameContact = normalizedContact(record.contact) &&
     normalizedContact(record.contact) === normalizedContact(applicant.contact);
-  if (sameContact && (sameSurname || declaredMember || reverseMember)) {
+  if (sameContact && (hasNameLink || declaredMember || reverseMember)) {
     score += 28;
     reasons.push("Same contact number");
   }
@@ -129,8 +152,8 @@ function scoreHouseholdConnection(
     !applicantProfile.dismissedRelativeKeys.includes(currentKey)
   );
   if (confirmed && !reasons.length) reasons.push("Relationship confirmed by staff");
-  const hasFamilyEvidence = sameSurname || Boolean(declaredMember) || Boolean(reverseMember);
-  if (!confirmed && (!hasFamilyEvidence || score < 45)) return null;
+  const hasFamilyEvidence = hasNameLink || Boolean(declaredMember) || Boolean(reverseMember);
+  if (!confirmed && (!hasFamilyEvidence || score < 52)) return null;
 
   return {
     key: candidateKey,
@@ -200,7 +223,13 @@ function normalizedContact(value: string): string {
   return digits.length >= 7 ? digits.slice(-10) : "";
 }
 
-function usableSurname(value: string): string {
+function usableNamePart(value: string): string {
   const normalized = normalizeIdentityPart(value);
   return ["", "notrecorded", "na", "none", "unknown"].includes(normalized) ? "" : normalized;
+}
+
+function usableMiddleName(value: string): string {
+  const normalized = usableNamePart(value);
+  const letters = normalized.replace(/[^a-z0-9]/g, "");
+  return letters.length > 1 ? normalized : "";
 }
