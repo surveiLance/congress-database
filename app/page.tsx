@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdvancedFilters, { defaultRecordFilters, RecordFilters } from "@/components/AdvancedFilters";
 import ConditionMigration from "@/components/ConditionMigration";
 import Dashboard from "@/components/Dashboard";
@@ -51,7 +51,8 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   const [error, setError] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const [recordPage, setRecordPage] = useState(1);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = useState(20);
+  const recordTableRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -125,9 +126,11 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   }, [filters, query, visibleRecords]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const firstVisibleRecord = filtered.length ? (recordPage - 1) * pageSize + 1 : 0;
+  const lastVisibleRecord = Math.min(recordPage * pageSize, filtered.length);
   const pagedRecords = useMemo(
     () => filtered.slice((recordPage - 1) * pageSize, recordPage * pageSize),
-    [filtered, recordPage],
+    [filtered, pageSize, recordPage],
   );
 
   useEffect(() => {
@@ -137,6 +140,11 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   useEffect(() => {
     if (recordPage > pageCount) setRecordPage(pageCount);
   }, [pageCount, recordPage]);
+
+  const changeRecordPage = (page: number) => {
+    setRecordPage(Math.min(pageCount, Math.max(1, page)));
+    recordTableRef.current?.scrollTo({ top: 0 });
+  };
 
   useEffect(() => {
     const visibleIds = new Set(filtered.flatMap((record) => record.id === undefined ? [] : [record.id]));
@@ -392,9 +400,31 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               <AdvancedFilters filters={filters} records={records} matchingCount={filtered.length} onChange={setFilters} />
             </div>
             {showArchived && <div className="archive-info"><strong>Archived Records</strong><span>Restore an application, or permanently delete it when it should no longer be included in applicant history and reports.</span></div>}
-            <div className="record-results" role="status">
-              <strong>{filtered.length}</strong> matching record{filtered.length === 1 ? "" : "s"}
-              {filtered.length > pageSize && <span> · showing {(recordPage - 1) * pageSize + 1}–{Math.min(recordPage * pageSize, filtered.length)}</span>}
+            <div className="record-list-controls">
+              <div className="record-results" role="status">
+                <strong>{filtered.length.toLocaleString()}</strong> matching record{filtered.length === 1 ? "" : "s"}
+                <span> · showing {firstVisibleRecord.toLocaleString()}–{lastVisibleRecord.toLocaleString()}</span>
+              </div>
+              <nav className="record-pagination compact" aria-label="Record pages above table">
+                <button className="btn secondary small" type="button" disabled={recordPage === 1} onClick={() => changeRecordPage(recordPage - 1)}>Previous</button>
+                <span>Page <strong>{recordPage}</strong> of <strong>{pageCount}</strong></span>
+                <button className="btn secondary small" type="button" disabled={recordPage === pageCount} onClick={() => changeRecordPage(recordPage + 1)}>Next</button>
+              </nav>
+              <label className="page-size-control">
+                <span>Rows</span>
+                <select
+                  value={pageSize}
+                  onChange={(event) => {
+                    setPageSize(Number(event.target.value));
+                    setRecordPage(1);
+                    recordTableRef.current?.scrollTo({ top: 0 });
+                  }}
+                >
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </label>
             </div>
             <div className={`bulk-record-bar${selectedApplications.length ? " has-selection" : ""}`}>
               <button className="bulk-select-toggle" type="button" disabled={!filtered.length} onClick={toggleAllMatching}>
@@ -426,12 +456,13 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               selectedIds={selectedIds}
               onToggleSelected={toggleSelectedApplication}
               onToggleAll={toggleCurrentPage}
+              containerRef={recordTableRef}
             />
             {filtered.length > pageSize && (
               <nav className="record-pagination" aria-label="Record pages">
-                <button className="btn secondary small" type="button" disabled={recordPage === 1} onClick={() => setRecordPage((page) => page - 1)}>Previous</button>
+                <button className="btn secondary small" type="button" disabled={recordPage === 1} onClick={() => changeRecordPage(recordPage - 1)}>Previous</button>
                 <span>Page <strong>{recordPage}</strong> of <strong>{pageCount}</strong></span>
-                <button className="btn secondary small" type="button" disabled={recordPage === pageCount} onClick={() => setRecordPage((page) => page + 1)}>Next</button>
+                <button className="btn secondary small" type="button" disabled={recordPage === pageCount} onClick={() => changeRecordPage(recordPage + 1)}>Next</button>
               </nav>
             )}
         </div>

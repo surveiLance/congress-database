@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { Ref, useMemo } from "react";
 import { applicantIdentityKey, buildApplicantHistories, formatPeso } from "@/lib/applicantIdentity";
 import { householdSummaryForRecord } from "@/lib/householdMatching";
 import { AssistanceRecord } from "@/lib/types";
@@ -15,6 +15,7 @@ interface Props {
   selectedIds?: Set<number>;
   onToggleSelected?: (record: AssistanceRecord) => void;
   onToggleAll?: () => void;
+  containerRef?: Ref<HTMLDivElement>;
 }
 
 export default function RecordTable({
@@ -29,12 +30,13 @@ export default function RecordTable({
   selectedIds = new Set<number>(),
   onToggleSelected,
   onToggleAll,
+  containerRef,
 }: Props) {
   const histories = useMemo(() => buildApplicantHistories(allRecords), [allRecords]);
   const selectableIds = records.flatMap((record) => record.id === undefined ? [] : [record.id]);
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
   return (
-    <div className="table-container">
+    <div className="table-container record-table-container" ref={containerRef}>
       <table>
         <thead><tr>
           {onToggleSelected && (
