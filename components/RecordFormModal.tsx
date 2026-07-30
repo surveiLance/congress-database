@@ -11,6 +11,7 @@ import {
   standardizeApplicantText,
 } from "@/lib/applicantIdentity";
 import { conditionCategories } from "@/lib/conditionCategories";
+import { householdSummaryForRecord } from "@/lib/householdMatching";
 import { AssistanceRecord, emptyRecord, FamilyMember } from "@/lib/types";
 
 interface Props {
@@ -65,6 +66,17 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
       .filter((history) => history.priorApplications.length > 0)
       .sort((first, second) => (Date.parse(second.latestApplicationDate) || 0) - (Date.parse(first.latestApplicationDate) || 0));
   }, [currentApplicantKey, existingRecords, form.firstName, form.surname, initialRecord?.id]);
+
+  const householdReview = useMemo(() => {
+    const hasHouseholdClue = Boolean(
+      form.address.trim() ||
+      form.contact.trim() ||
+      form.familyComposition.some((member) => member.fullName.trim()),
+    );
+    if (!hasHouseholdClue) return null;
+    const summary = householdSummaryForRecord(form, existingRecords);
+    return summary.connections.length ? summary : null;
+  }, [existingRecords, form]);
 
   if (!open) return null;
 
@@ -270,50 +282,7 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                 <Field label="Barangay *"><Select required value={form.brgy} options={barangays} placeholder="Select Barangay" onChange={(v) => update("brgy", v)} /></Field>
                 <Field label="Address *" full><input required value={form.address} onChange={(e) => update("address", e.target.value)} /></Field>
 
-                <h3 className="section-title">4. Work & Income</h3>
-                <Field label="Work/Occupation"><input value={form.work} onChange={(e) => update("work", e.target.value)} /></Field>
-                <Field label="Monthly Salary (₱)"><input type="number" min="0" step=".01" value={form.salary} onFocus={selectInitialZero} onChange={(e) => update("salary", Number(e.target.value))} /></Field>
-                <Field label="Employment Status"><Select value={form.employedStatus} options={["Employed", "Seasonal", "Unemployed"]} onChange={(v) => update("employedStatus", v)} /></Field>
-
-                <h3 className="section-title">5. Status & Category</h3>
-                <Field label="Civil Status *"><Select required value={form.civilStatus} options={["Single", "Married", "Widowed", "Separated"]} placeholder="Select" onChange={(v) => update("civilStatus", v)} /></Field>
-                <Field label="Category *"><Select required value={form.category} options={["FHONA", "SENIOR", "PLHIV"]} placeholder="Select Category" onChange={(v) => update("category", v)} /></Field>
-
-                <h3 className="section-title">6. Assistance Request</h3>
-                <Field label="Type of Assistance *"><Select required value={form.assistanceType} options={["Medical", "Financial", "Educational", "Burial"]} placeholder="Select Type" onChange={(v) => update("assistanceType", v)} /></Field>
-                <Field label="Amount Requested (₱)"><input type="number" min="0" step=".01" value={form.amountRequested} onFocus={selectInitialZero} onChange={(e) => update("amountRequested", Number(e.target.value))} /></Field>
-                <Field label="Amount Granted (₱) *"><input required type="number" min="0" step=".01" value={form.amount} onFocus={selectInitialZero} onChange={(e) => update("amount", Number(e.target.value))} /></Field>
-                <Field label="Relationship to Beneficiary"><input value={form.relationship} placeholder="e.g. Self, Parent, Child" onChange={(e) => update("relationship", e.target.value)} /></Field>
-
-                <h3 className="section-title">7. Beneficiary & Medical Details</h3>
-                <Field label="Beneficiary Full Name" full><input value={form.benName} onChange={(e) => update("benName", e.target.value)} /></Field>
-                <Field label="Beneficiary Birthday"><input type="date" value={form.benBday} onChange={(e) => setForm((current) => ({ ...current, benBday: e.target.value, benAge: ageFromBirthday(e.target.value) }))} /></Field>
-                <Field label="Beneficiary Age"><input readOnly type="number" value={form.benAge} /></Field>
-                <Field label="Beneficiary Sex"><Select value={form.benSex} options={["Male", "Female"]} placeholder="Select" onChange={(v) => update("benSex", v)} /></Field>
-                <Field label="Family Member Relation"><input value={form.benFamilyMember} onChange={(e) => update("benFamilyMember", e.target.value)} /></Field>
-                <Field label="Beneficiary Civil Status"><Select value={form.benCivilStatus} options={["Single", "Married", "Widowed", "Separated"]} placeholder="Select" onChange={(v) => update("benCivilStatus", v)} /></Field>
-                <Field label="Beneficiary Category"><Select value={form.benCategory} options={["FHONA", "SENIOR", "PLHIV"]} placeholder="Select" onChange={(v) => update("benCategory", v)} /></Field>
-                <Field label="Diagnosis / Condition" full><textarea rows={2} value={form.diagnosis} onChange={(e) => update("diagnosis", e.target.value)} /></Field>
-                <fieldset className="form-group full-width condition-selector">
-                  <legend>Standardized Condition Categories</legend>
-                  <p>Select every category that applies. The original diagnosis text remains unchanged.</p>
-                  <div className="condition-options">
-                    {conditionCategories.map((category) => (
-                      <label key={category}>
-                        <input type="checkbox" checked={form.conditionCategories.includes(category)} onChange={() => toggleConditionCategory(category)} />
-                        <span>{category}</span>
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-                {form.conditionCategories.includes("Other") && (
-                  <Field label="Other condition specification" full>
-                    <input value={form.conditionOther} onChange={(event) => update("conditionOther", event.target.value)} placeholder="Specify the other condition category" />
-                  </Field>
-                )}
-                <Field label="Remarks" full><textarea rows={2} value={form.remarks} onChange={(e) => update("remarks", e.target.value)} /></Field>
-
-                <h3 className="section-title">8. Household Composition & Expenses</h3>
+                <h3 className="section-title">4. Household & Family</h3>
                 <Field label="Total Household Members">
                   <input
                     type="number"
@@ -328,14 +297,14 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                 <div className="family-composition-editor">
                   <div className="family-composition-heading">
                     <div>
-                      <strong>Family or Household Members</strong>
-                      <small>List names when known so the system can find previous applicants from the same family.</small>
+                      <strong>Family names <span>(optional)</span></strong>
+                      <small>Add names when they appear on the paperwork. The record can still be saved when names are unavailable.</small>
                     </div>
-                    <button className="btn secondary small" type="button" onClick={addFamilyMember}>+ Add Member</button>
+                    <button className="btn secondary small" type="button" onClick={addFamilyMember}>+ Add Family Name</button>
                   </div>
                   {!form.familyComposition.length && (
                     <div className="family-composition-empty">
-                      No members listed yet. The total household count above can still be used by itself.
+                      No names provided. The system will still check exact shared addresses and contact numbers.
                     </div>
                   )}
                   {form.familyComposition.map((member, index) => (
@@ -374,6 +343,75 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                     </button>
                   )}
                 </div>
+                {householdReview && (
+                  <div className="encoding-household-alert" role="status">
+                    <div className="encoding-household-heading">
+                      <div>
+                        <span className="eyebrow">Household check</span>
+                        <strong>{householdReview.connections.length} possible related applicant{householdReview.connections.length === 1 ? "" : "s"} found</strong>
+                      </div>
+                      <small>Review only—nothing is linked automatically.</small>
+                    </div>
+                    <div className="encoding-household-list">
+                      {householdReview.connections.slice(0, 3).map((connection) => (
+                        <div key={connection.key}>
+                          <span>
+                            <strong>{connection.applicant.surname}, {connection.applicant.firstName} {connection.applicant.middleName}</strong>
+                            <small>{connection.reasons.join(" · ")}</small>
+                          </span>
+                          <span>
+                            <strong>{formatPeso(connection.history.totalGranted)}</strong>
+                            <small>{connection.history.applicationCount} application{connection.history.applicationCount === 1 ? "" : "s"}</small>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <h3 className="section-title">5. Work & Income</h3>
+                <Field label="Work/Occupation"><input value={form.work} onChange={(e) => update("work", e.target.value)} /></Field>
+                <Field label="Monthly Salary (₱)"><input type="number" min="0" step=".01" value={form.salary} onFocus={selectInitialZero} onChange={(e) => update("salary", Number(e.target.value))} /></Field>
+                <Field label="Employment Status"><Select value={form.employedStatus} options={["Employed", "Seasonal", "Unemployed"]} onChange={(v) => update("employedStatus", v)} /></Field>
+
+                <h3 className="section-title">6. Status & Category</h3>
+                <Field label="Civil Status *"><Select required value={form.civilStatus} options={["Single", "Married", "Widowed", "Separated"]} placeholder="Select" onChange={(v) => update("civilStatus", v)} /></Field>
+                <Field label="Category *"><Select required value={form.category} options={["FHONA", "SENIOR", "PLHIV"]} placeholder="Select Category" onChange={(v) => update("category", v)} /></Field>
+
+                <h3 className="section-title">7. Assistance Granted</h3>
+                <Field label="Type of Assistance *"><Select required value={form.assistanceType} options={["Medical", "Financial", "Educational", "Burial"]} placeholder="Select Type" onChange={(v) => update("assistanceType", v)} /></Field>
+                <Field label="Amount Requested (₱)"><input type="number" min="0" step=".01" value={form.amountRequested} onFocus={selectInitialZero} onChange={(e) => update("amountRequested", Number(e.target.value))} /></Field>
+                <Field label="Amount Granted (₱) *"><input required type="number" min="0" step=".01" value={form.amount} onFocus={selectInitialZero} onChange={(e) => update("amount", Number(e.target.value))} /></Field>
+                <Field label="Relationship to Beneficiary"><input value={form.relationship} placeholder="e.g. Self, Parent, Child" onChange={(e) => update("relationship", e.target.value)} /></Field>
+
+                <h3 className="section-title">8. Beneficiary & Medical Details</h3>
+                <Field label="Beneficiary Full Name" full><input value={form.benName} onChange={(e) => update("benName", e.target.value)} /></Field>
+                <Field label="Beneficiary Birthday"><input type="date" value={form.benBday} onChange={(e) => setForm((current) => ({ ...current, benBday: e.target.value, benAge: ageFromBirthday(e.target.value) }))} /></Field>
+                <Field label="Beneficiary Age"><input readOnly type="number" value={form.benAge} /></Field>
+                <Field label="Beneficiary Sex"><Select value={form.benSex} options={["Male", "Female"]} placeholder="Select" onChange={(v) => update("benSex", v)} /></Field>
+                <Field label="Family Member Relation"><input value={form.benFamilyMember} onChange={(e) => update("benFamilyMember", e.target.value)} /></Field>
+                <Field label="Beneficiary Civil Status"><Select value={form.benCivilStatus} options={["Single", "Married", "Widowed", "Separated"]} placeholder="Select" onChange={(v) => update("benCivilStatus", v)} /></Field>
+                <Field label="Beneficiary Category"><Select value={form.benCategory} options={["FHONA", "SENIOR", "PLHIV"]} placeholder="Select" onChange={(v) => update("benCategory", v)} /></Field>
+                <Field label="Diagnosis / Condition" full><textarea rows={2} value={form.diagnosis} onChange={(e) => update("diagnosis", e.target.value)} /></Field>
+                <fieldset className="form-group full-width condition-selector">
+                  <legend>Standardized Condition Categories</legend>
+                  <p>Select every category that applies. The original diagnosis text remains unchanged.</p>
+                  <div className="condition-options">
+                    {conditionCategories.map((category) => (
+                      <label key={category}>
+                        <input type="checkbox" checked={form.conditionCategories.includes(category)} onChange={() => toggleConditionCategory(category)} />
+                        <span>{category}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                {form.conditionCategories.includes("Other") && (
+                  <Field label="Other condition specification" full>
+                    <input value={form.conditionOther} onChange={(event) => update("conditionOther", event.target.value)} placeholder="Specify the other condition category" />
+                  </Field>
+                )}
+                <Field label="Remarks" full><textarea rows={2} value={form.remarks} onChange={(e) => update("remarks", e.target.value)} /></Field>
+
               </div>
             </div>
 

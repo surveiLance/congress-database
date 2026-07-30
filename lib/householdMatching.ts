@@ -102,14 +102,14 @@ function scoreHouseholdConnection(
   const sameAddress = normalizedAddress(record.address) &&
     normalizedAddress(record.address) === normalizedAddress(applicant.address);
   if (sameAddress) {
-    score += 28;
+    score += 38;
     reasons.push("Same recorded address");
   }
 
   const sameContact = normalizedContact(record.contact) &&
     normalizedContact(record.contact) === normalizedContact(applicant.contact);
   if (sameContact) {
-    score += 26;
+    score += 38;
     reasons.push("Same contact number");
   }
 
