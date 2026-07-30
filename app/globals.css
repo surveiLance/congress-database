@@ -291,12 +291,22 @@ h1 { color: #063f24; font-size: clamp(1.25rem, 2vw, 1.65rem); line-height: 1.2; 
 .filter-footer-actions { display: flex; gap: 8px; }
 .record-results { display: flex; justify-content: flex-end; margin: 0 2px 8px; color: var(--muted); font-size: .85rem; }
 .record-results strong { margin-right: 4px; color: var(--text); }
+.bulk-record-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: #f8fafc; color: var(--muted); font-size: .76rem; }
+.bulk-record-bar.has-selection { border-color: #86c99e; background: #f0fbf4; box-shadow: inset 3px 0 var(--primary); }
+.bulk-select-toggle { flex: 0 0 auto; padding: 5px 8px; border: 1px solid #a9dabb; border-radius: 7px; background: white; color: var(--primary); cursor: pointer; font: inherit; font-size: .73rem; font-weight: 800; }
+.bulk-select-toggle:hover:not(:disabled) { background: #e1f5e8; }
+.bulk-select-toggle:disabled { cursor: not-allowed; opacity: .55; }
+.bulk-record-bar > span { min-width: 0; flex: 1; }
+.bulk-record-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .search-input:focus, input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px #0872391f; outline: none; }
 .table-container { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 table { width: 100%; border-collapse: collapse; text-align: left; font-size: .9rem; }
 th, td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
 th { background: #f1f5f9; color: var(--muted); font-weight: 600; }
 tr:hover { background: #f8fafc; }
+.selected-record-row, .selected-record-row:hover { background: #edf9f1; box-shadow: inset 3px 0 var(--primary); }
+.selection-column { width: 42px; padding-inline: 12px; text-align: center; }
+.selection-column input { width: 17px; height: 17px; cursor: pointer; accent-color: var(--primary); }
 .empty { padding: 24px; text-align: center; color: var(--muted); }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; background: #d5f1df; color: var(--primary); font-size: .75rem; font-weight: 700; }
 .history-summary { display: grid; min-width: 135px; gap: 1px; }
@@ -526,6 +536,10 @@ textarea { resize: vertical; }
   .filter-footer { align-items: stretch; flex-direction: column; }
   .filter-footer-actions { display: grid; grid-template-columns: repeat(2, 1fr); }
   .filter-footer .btn { justify-content: center; }
+  .bulk-record-bar { align-items: stretch; flex-direction: column; }
+  .bulk-select-toggle { align-self: flex-start; }
+  .bulk-record-actions { display: grid; grid-template-columns: 1fr; }
+  .bulk-record-actions .btn { justify-content: center; }
   .dashboard-heading { align-items: stretch; flex-direction: column; }
   .dashboard-heading .btn { justify-content: center; }
   .chart-card-heading { align-items: flex-start; flex-direction: column; gap: 2px; }

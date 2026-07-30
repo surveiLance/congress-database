@@ -11,21 +11,63 @@ interface Props {
   onArchive?: (record: AssistanceRecord) => void;
   onRestore?: (record: AssistanceRecord) => void;
   onPermanentDelete?: (record: AssistanceRecord) => void;
+  selectedIds?: Set<number>;
+  onToggleSelected?: (record: AssistanceRecord) => void;
+  onToggleAll?: () => void;
 }
 
-export default function RecordTable({ records, allRecords = records, archived = false, onView, onEdit, onArchive, onRestore, onPermanentDelete }: Props) {
+export default function RecordTable({
+  records,
+  allRecords = records,
+  archived = false,
+  onView,
+  onEdit,
+  onArchive,
+  onRestore,
+  onPermanentDelete,
+  selectedIds = new Set<number>(),
+  onToggleSelected,
+  onToggleAll,
+}: Props) {
   const histories = buildApplicantHistories(allRecords);
+  const selectableIds = records.flatMap((record) => record.id === undefined ? [] : [record.id]);
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
   return (
     <div className="table-container">
       <table>
-        <thead><tr><th>Full Name</th><th>Birthday / Age</th><th>Barangay</th><th>Assistance Type</th><th>This Grant</th><th>Applicant History</th><th>Action</th></tr></thead>
+        <thead><tr>
+          {onToggleSelected && (
+            <th className="selection-column">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                disabled={!selectableIds.length}
+                onChange={onToggleAll}
+                aria-label={allSelected ? "Deselect all matching applications" : "Select all matching applications"}
+              />
+            </th>
+          )}
+          <th>Full Name</th><th>Birthday / Age</th><th>Barangay</th><th>Assistance Type</th><th>This Grant</th><th>Applicant History</th><th>Action</th>
+        </tr></thead>
         <tbody>
-          {!records.length && <tr><td colSpan={7} className="empty">No records found.</td></tr>}
+          {!records.length && <tr><td colSpan={onToggleSelected ? 8 : 7} className="empty">No records found.</td></tr>}
           {records.map((record) => {
             const history = histories.get(applicantIdentityKey(record));
             const household = householdSummaryForRecord(record, allRecords);
+            const selected = record.id !== undefined && selectedIds.has(record.id);
             return (
-            <tr key={record.id}>
+            <tr className={selected ? "selected-record-row" : ""} key={record.id}>
+              {onToggleSelected && (
+                <td className="selection-column">
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    disabled={record.id === undefined}
+                    onChange={() => onToggleSelected(record)}
+                    aria-label={`Select application for ${record.firstName} ${record.surname}`}
+                  />
+                </td>
+              )}
               <td><strong>{record.surname}, {record.firstName} {record.middleName} {record.suffix}</strong></td>
               <td>{record.birthday} ({record.age} yrs)</td>
               <td>{record.brgy}</td>

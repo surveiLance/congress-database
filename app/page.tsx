@@ -49,6 +49,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   const [selected, setSelected] = useState<AssistanceRecord | null>(null);
   const [filters, setFilters] = useState<RecordFilters>({ ...defaultRecordFilters });
   const [error, setError] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
 
   const refresh = useCallback(async () => {
     try {
@@ -120,6 +121,19 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     return matching.sort((first, second) => compareRecords(first, second, filters.sort));
   }, [filters, query, visibleRecords]);
 
+  useEffect(() => {
+    const visibleIds = new Set(filtered.flatMap((record) => record.id === undefined ? [] : [record.id]));
+    setSelectedIds((current) => {
+      const next = new Set(Array.from(current).filter((id) => visibleIds.has(id)));
+      return next.size === current.size && Array.from(next).every((id) => current.has(id)) ? current : next;
+    });
+  }, [filtered]);
+
+  const selectedApplications = useMemo(
+    () => filtered.filter((record) => record.id !== undefined && selectedIds.has(record.id)),
+    [filtered, selectedIds],
+  );
+
   const save = async (record: AssistanceRecord) => {
     if (record.id === undefined) {
       await addRecord(record);
@@ -165,6 +179,71 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     } catch (reason) {
       console.error(reason);
       setError("The archived application could not be deleted. Please try again.");
+    }
+  };
+
+  const toggleSelectedApplication = (record: AssistanceRecord) => {
+    if (record.id === undefined) return;
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(record.id as number)) next.delete(record.id as number);
+      else next.add(record.id as number);
+      return next;
+    });
+  };
+
+  const toggleAllMatching = () => {
+    const matchingIds = filtered.flatMap((record) => record.id === undefined ? [] : [record.id]);
+    const everyMatchingRecordSelected = matchingIds.length > 0 && matchingIds.every((id) => selectedIds.has(id));
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      matchingIds.forEach((id) => everyMatchingRecordSelected ? next.delete(id) : next.add(id));
+      return next;
+    });
+  };
+
+  const bulkArchive = async () => {
+    if (!selectedApplications.length ||
+      !window.confirm(`Archive ${selectedApplications.length} selected application${selectedApplications.length === 1 ? "" : "s"}? They can be restored later.`)) return;
+    try {
+      const now = new Date().toISOString();
+      await Promise.all(selectedApplications.map((record) => updateRecord({ ...record, archivedAt: now, updatedAt: now })));
+      setSelectedIds(new Set());
+      await refresh();
+    } catch (reason) {
+      console.error(reason);
+      setError("The selected applications could not all be archived. Refresh and try again.");
+    }
+  };
+
+  const bulkRestore = async () => {
+    if (!selectedApplications.length ||
+      !window.confirm(`Restore ${selectedApplications.length} selected application${selectedApplications.length === 1 ? "" : "s"} to active records?`)) return;
+    try {
+      const now = new Date().toISOString();
+      await Promise.all(selectedApplications.map((record) => updateRecord({ ...record, archivedAt: "", updatedAt: now })));
+      setSelectedIds(new Set());
+      await refresh();
+    } catch (reason) {
+      console.error(reason);
+      setError("The selected applications could not all be restored. Refresh and try again.");
+    }
+  };
+
+  const bulkPermanentDelete = async () => {
+    if (!selectedApplications.length) return;
+    const response = window.prompt(
+      `WARNING: Permanently deleting ${selectedApplications.length} archived application${selectedApplications.length === 1 ? "" : "s"} will remove them from history, reports, and the shared database. This cannot be undone.\n\nType DELETE to continue.`,
+    );
+    if (response !== "DELETE") return;
+    try {
+      await Promise.all(selectedApplications.flatMap((record) => record.id === undefined ? [] : [deleteRecord(record.id)]));
+      setSelectedIds(new Set());
+      await refresh();
+      window.alert(`${selectedApplications.length} archived application${selectedApplications.length === 1 ? " was" : "s were"} permanently deleted.`);
+    } catch (reason) {
+      console.error(reason);
+      setError("The selected applications could not all be deleted. Refresh to check which records remain.");
     }
   };
 
@@ -269,6 +348,24 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
             <div className="record-results" role="status">
               <strong>{filtered.length}</strong> matching record{filtered.length === 1 ? "" : "s"}
             </div>
+            <div className={`bulk-record-bar${selectedApplications.length ? " has-selection" : ""}`}>
+              <button className="bulk-select-toggle" type="button" disabled={!filtered.length} onClick={toggleAllMatching}>
+                {selectedApplications.length === filtered.length && filtered.length > 0 ? "Deselect all" : `Select all ${filtered.length || ""}`.trim()}
+              </button>
+              <span>
+                {selectedApplications.length
+                  ? `${selectedApplications.length} application${selectedApplications.length === 1 ? "" : "s"} selected`
+                  : "Select applications to manage them together"}
+              </span>
+              {selectedApplications.length > 0 && (
+                <div className="bulk-record-actions">
+                  <button className="btn secondary small" type="button" onClick={() => setSelectedIds(new Set())}>Clear</button>
+                  {!showArchived && <button className="btn warning small" type="button" onClick={() => void bulkArchive()}>Archive Selected</button>}
+                  {showArchived && <button className="btn small" type="button" onClick={() => void bulkRestore()}>Restore Selected</button>}
+                  {showArchived && <button className="btn danger small" type="button" onClick={() => void bulkPermanentDelete()}>Delete Selected Permanently</button>}
+                </div>
+              )}
+            </div>
             <RecordTable
               records={filtered}
               allRecords={records}
@@ -278,6 +375,9 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               onArchive={showArchived ? undefined : archive}
               onRestore={showArchived ? restore : undefined}
               onPermanentDelete={showArchived ? permanentlyDelete : undefined}
+              selectedIds={selectedIds}
+              onToggleSelected={toggleSelectedApplication}
+              onToggleAll={toggleAllMatching}
             />
         </div>
 
