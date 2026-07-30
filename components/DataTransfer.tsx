@@ -10,7 +10,7 @@ import {
   recordsToCsv,
 } from "@/lib/dataTransfer";
 import { ExcelImportSummary, parseMaipExcelImport } from "@/lib/excelImport";
-import { addRecords, updateRecord, usesSharedDatabase } from "@/lib/recordStore";
+import { addRecords, getCompleteRecords, updateRecord, usesSharedDatabase } from "@/lib/recordStore";
 
 type ImportFormat = "JSON" | "CSV" | "Excel";
 type PreviewFilter = "all" | "ready" | "duplicate" | "failed";
@@ -30,16 +30,32 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
   const [fileName, setFileName] = useState("");
   const [overwrite, setOverwrite] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [exportingBackup, setExportingBackup] = useState(false);
   const [progress, setProgress] = useState("");
   const [excelSummary, setExcelSummary] = useState<ExcelImportSummary | null>(null);
   const [previewFilter, setPreviewFilter] = useState<PreviewFilter>("all");
   const [result, setResult] = useState<ImportResult | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const exportJson = () => {
-    const backup = { version: 1, exportedAt: new Date().toISOString(), records };
-    downloadFile(JSON.stringify(backup, null, 2), `assistance-backup-${dateStamp()}.json`, "application/json");
-    setMessage({ type: "success", text: `Exported ${records.length} record${records.length === 1 ? "" : "s"} to JSON.` });
+  const exportJson = async () => {
+    setExportingBackup(true);
+    setMessage(null);
+    try {
+      const completeRecords = await getCompleteRecords();
+      const exportRecords = completeRecords.map((record) => {
+        const exportRecord: Partial<AssistanceRecord> = { ...record };
+        delete exportRecord.recordLoadState;
+        return exportRecord;
+      });
+      const backup = { version: 1, exportedAt: new Date().toISOString(), records: exportRecords };
+      downloadFile(JSON.stringify(backup, null, 2), `assistance-backup-${dateStamp()}.json`, "application/json");
+      setMessage({ type: "success", text: `Exported ${completeRecords.length} complete record${completeRecords.length === 1 ? "" : "s"} and attached images to JSON.` });
+    } catch (error) {
+      console.error(error);
+      setMessage({ type: "error", text: "The complete JSON backup could not be prepared. Check the connection and try again." });
+    } finally {
+      setExportingBackup(false);
+    }
   };
 
   const exportCsv = () => {
@@ -151,7 +167,7 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
           <p>Export a backup or preview imported records before saving them to the {usesSharedDatabase ? "shared database" : "current browser"}.</p>
         </div>
         <div className="transfer-actions">
-          <button className="btn secondary" onClick={exportJson}>Export JSON</button>
+          <button className="btn secondary" disabled={exportingBackup} onClick={() => void exportJson()}>{exportingBackup ? "Preparing Backup…" : "Export JSON"}</button>
           <button className="btn secondary" onClick={() => jsonInput.current?.click()}>Import JSON</button>
           <button className="btn secondary" onClick={exportCsv}>Export CSV</button>
           <button className="btn secondary" onClick={() => csvInput.current?.click()}>Import CSV</button>

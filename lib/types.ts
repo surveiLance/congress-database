@@ -32,6 +32,8 @@ export interface LegacyApplicationData {
 
 export interface AssistanceRecord {
   id?: number;
+  /** Client-only loading hint. Never persisted to Supabase or exports. */
+  recordLoadState?: "summary" | "full";
   surname: string;
   firstName: string;
   middleName: string;

@@ -23,11 +23,29 @@ create index if not exists assistance_records_applicant_history_idx
 create index if not exists assistance_records_created_at_idx
   on public.assistance_records (created_at desc);
 
+-- The records desk, filters, matching, and reports need application metadata,
+-- but not the large front/back image data. This security-invoker view removes
+-- images before the response leaves Supabase. A complete row is fetched only
+-- when staff opens or edits an application.
+create or replace view public.assistance_record_summaries
+with (security_invoker = true)
+as
+select
+  id,
+  record - 'idImage' - 'idImageBack' as record,
+  surname_normalized,
+  first_name_normalized,
+  birthday,
+  created_at,
+  updated_at
+from public.assistance_records;
+
 alter table public.assistance_records enable row level security;
 
 revoke all on public.assistance_records from anon;
 grant select, insert, update, delete on public.assistance_records to authenticated;
 grant usage, select on sequence public.assistance_records_id_seq to authenticated;
+grant select on public.assistance_record_summaries to authenticated;
 
 drop policy if exists "Authenticated staff can read shared records" on public.assistance_records;
 create policy "Authenticated staff can read shared records"

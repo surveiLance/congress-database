@@ -49,8 +49,15 @@ saves new shared records to Supabase in batches.
 
 Application records are filtered and sorted by their actual application date.
 The records desk keeps that date filter visible and displays large result sets
-in pages of 50 applications. Shared record loading automatically retrieves every
-Supabase page rather than stopping at the API's first result page.
+in pages of 50 applications. Shared record loading retrieves lightweight
+application summaries without the front/back ID images so search, applicant
+history, matching, and reports remain complete. A full record and its images are
+loaded only when staff opens or edits it.
+
+For a Supabase project created before this optimization was added, run
+[`supabase/performance.sql`](supabase/performance.sql) once in the Supabase SQL
+Editor. Until that view is installed, the application automatically falls back
+to the older compatible full-record query.
 
 ## Record management
 

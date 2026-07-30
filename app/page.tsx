@@ -12,7 +12,7 @@ import RecordFormModal from "@/components/RecordFormModal";
 import RecordTable from "@/components/RecordTable";
 import StaffAuthGate from "@/components/StaffAuthGate";
 import ViewRecordModal from "@/components/ViewRecordModal";
-import { addRecord, deleteRecord, getRecords, subscribeToRecordChanges, updateRecord } from "@/lib/recordStore";
+import { addRecord, deleteRecord, getRecord, getRecords, subscribeToRecordChanges, updateRecord } from "@/lib/recordStore";
 import { applicantIdentityKey } from "@/lib/applicantIdentity";
 import { getSupabaseClient } from "@/lib/supabase";
 import { AssistanceRecord } from "@/lib/types";
@@ -165,8 +165,26 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     setFormOpen(true);
   };
 
-  const openEditRecord = (record: AssistanceRecord) => {
-    setEditing(record);
+  const loadCompleteRecord = async (record: AssistanceRecord): Promise<AssistanceRecord | null> => {
+    if (record.id === undefined || record.recordLoadState !== "summary") return record;
+    try {
+      return await getRecord(record.id);
+    } catch (reason) {
+      console.error(reason);
+      setError("The complete application could not be loaded. Check the connection and try again.");
+      return null;
+    }
+  };
+
+  const openViewRecord = async (record: AssistanceRecord) => {
+    const complete = await loadCompleteRecord(record);
+    if (complete) setSelected(complete);
+  };
+
+  const openEditRecord = async (record: AssistanceRecord) => {
+    const complete = await loadCompleteRecord(record);
+    if (!complete) return;
+    setEditing(complete);
     setFormOpen(true);
   };
 
@@ -276,8 +294,10 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
 
   const attachMatchedDocument = async (record: AssistanceRecord, imageData: string) => {
     if (record.id === undefined) return false;
-    if (record.idImage && !window.confirm(`Replace the document already attached to ${record.firstName} ${record.surname}?`)) return false;
-    await updateRecord({ ...record, idImage: imageData, updatedAt: new Date().toISOString() });
+    const complete = await loadCompleteRecord(record);
+    if (!complete) return false;
+    if (complete.idImage && !window.confirm(`Replace the document already attached to ${record.firstName} ${record.surname}?`)) return false;
+    await updateRecord({ ...complete, idImage: imageData, updatedAt: new Date().toISOString() });
     await refresh();
     return true;
   };
@@ -398,7 +418,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               records={pagedRecords}
               allRecords={records}
               archived={showArchived}
-              onView={setSelected}
+              onView={openViewRecord}
               onEdit={showArchived ? undefined : openEditRecord}
               onArchive={showArchived ? undefined : archive}
               onRestore={showArchived ? restore : undefined}
@@ -424,7 +444,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
                 <p>OCR text and possible matches stay visible for staff review.</p>
               </div>
             </section>
-            <DocumentScanner records={activeRecords} onView={setSelected} onAttachDocument={attachMatchedDocument} />
+            <DocumentScanner records={activeRecords} onView={openViewRecord} onAttachDocument={attachMatchedDocument} />
         </div>
 
         {workspace === "reports" && <div className="workspace-view">
@@ -435,7 +455,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
                 <p>Figures use the current record filters and contain no personally identifiable information.</p>
               </div>
             </section>
-            <Dashboard records={filtered} onView={setSelected} />
+            <Dashboard records={filtered} onView={openViewRecord} />
         </div>}
 
         <div className="workspace-view" hidden={workspace !== "utilities"}>
@@ -468,7 +488,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
         record={selected}
         allRecords={records}
         onClose={() => setSelected(null)}
-        onView={setSelected}
+        onView={openViewRecord}
         onUpdate={saveHouseholdDecision}
       />
     </main>

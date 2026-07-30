@@ -20,11 +20,23 @@ export const usesSharedDatabase = isSupabaseConfigured;
 export async function getRecords(): Promise<AssistanceRecord[]> {
   if (!isSupabaseConfigured) return getLocalRecords();
 
+  try {
+    return await getSharedRecords("assistance_record_summaries", true);
+  } catch (summaryError) {
+    console.warn("Lightweight record view unavailable; using the compatible full-record query.", summaryError);
+    return getSharedRecords("assistance_records", false);
+  }
+}
+
+async function getSharedRecords(
+  source: "assistance_record_summaries" | "assistance_records",
+  summaries: boolean,
+): Promise<AssistanceRecord[]> {
   const rows: SharedRecordRow[] = [];
   const pageSize = 1000;
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await getSupabaseClient()
-      .from("assistance_records")
+      .from(source)
       .select("id, record")
       .order("created_at", { ascending: false })
       .range(from, from + pageSize - 1);
@@ -35,8 +47,34 @@ export async function getRecords(): Promise<AssistanceRecord[]> {
   }
 
   return rows.map((row) =>
-    normalizeRecord({ ...row.record, id: Number(row.id) }),
+    normalizeRecord({
+      ...row.record,
+      id: Number(row.id),
+      recordLoadState: summaries ? "summary" : "full",
+    }),
   );
+}
+
+export async function getRecord(id: number): Promise<AssistanceRecord> {
+  if (!isSupabaseConfigured) {
+    const record = (await getLocalRecords()).find((candidate) => candidate.id === id);
+    if (!record) throw new Error("The requested record could not be found.");
+    return record;
+  }
+
+  const { data, error } = await getSupabaseClient()
+    .from("assistance_records")
+    .select("id, record")
+    .eq("id", id)
+    .single();
+  if (error) throw new Error(databaseMessage(error.message));
+  const row = data as SharedRecordRow;
+  return normalizeRecord({ ...row.record, id: Number(row.id), recordLoadState: "full" });
+}
+
+export async function getCompleteRecords(): Promise<AssistanceRecord[]> {
+  if (!isSupabaseConfigured) return getLocalRecords();
+  return getSharedRecords("assistance_records", false);
 }
 
 export async function addRecord(record: AssistanceRecord): Promise<void> {
@@ -106,9 +144,19 @@ export async function addRecords(
 }
 
 export async function updateRecord(record: AssistanceRecord): Promise<void> {
-  const standardized = standardizeApplicantText(record);
+  let standardized = standardizeApplicantText(record);
   if (!isSupabaseConfigured) return updateLocalRecord(standardized);
   if (record.id === undefined) throw new Error("An existing record ID is required.");
+  if (record.recordLoadState === "summary") {
+    const complete = await getRecord(record.id);
+    standardized = standardizeApplicantText({
+      ...complete,
+      ...record,
+      idImage: complete.idImage,
+      idImageBack: complete.idImageBack,
+      recordLoadState: "full",
+    });
+  }
 
   const client = getSupabaseClient();
   const user = await requireUser();
@@ -162,6 +210,7 @@ async function requireUser() {
 function toSharedPayload(record: AssistanceRecord) {
   const storedRecord: Partial<AssistanceRecord> = { ...record };
   delete storedRecord.id;
+  delete storedRecord.recordLoadState;
   return {
     record: storedRecord,
     surname_normalized: normalizeIdentityPart(record.surname),
