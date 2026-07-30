@@ -79,33 +79,48 @@ export default function Dashboard({ records, onView }: DashboardProps) {
       <details className="report-charts">
         <summary><strong>View detailed charts</strong><span>6 aggregated charts</span></summary>
         <div className="chart-grid">
-        <ChartCard title="Applicants by Barangay" hasData={barangayCounts.length > 0}>
+        <ChartCard
+          title="Applicants by Barangay"
+          hasData={barangayCounts.length > 0}
+          groups={barangayCounts.slice(0, 16)}
+          onSelect={(group) => setDrilldown({ chart: "Applicants by Barangay", group })}
+        >
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={barangayCounts.slice(0, 16)} layout="vertical" margin={{ top: 8, right: 16, left: 12, bottom: 8 }}>
+            <BarChart data={barangayCounts.slice(0, 16)} layout="vertical" margin={{ top: 8, right: 16, left: 12, bottom: 8 }} onClick={(entry) => openDrilldown("Applicants by Barangay", entry)}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" allowDecimals={false} />
               <YAxis type="category" dataKey="name" width={92} tick={{ fontSize: 10 }} />
               <Tooltip content={<ApplicantChartTooltip />} />
-              <Bar dataKey="value" name="Applicants" fill="#2563eb" radius={[4, 4, 0, 0]} cursor="pointer" onClick={(entry) => openDrilldown("Applicants by Barangay", entry)} />
+              <Bar dataKey="value" name="Applicants" fill="#2563eb" radius={[4, 4, 0, 0]} cursor="pointer" />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Applications by Assistance Type" hasData={assistanceCounts.length > 0}>
+        <ChartCard
+          title="Applications by Assistance Type"
+          hasData={assistanceCounts.length > 0}
+          groups={assistanceCounts}
+          onSelect={(group) => setDrilldown({ chart: "Applications by Assistance Type", group })}
+        >
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={assistanceCounts} layout="vertical" margin={{ top: 8, right: 16, left: 12, bottom: 8 }}>
+            <BarChart data={assistanceCounts} layout="vertical" margin={{ top: 8, right: 16, left: 12, bottom: 8 }} onClick={(entry) => openDrilldown("Applications by Assistance Type", entry)}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" allowDecimals={false} />
               <YAxis type="category" dataKey="name" width={92} tick={{ fontSize: 10 }} />
               <Tooltip content={<ApplicantChartTooltip />} />
-              <Bar dataKey="value" name="Applications" fill="#7c3aed" radius={[0, 4, 4, 0]} cursor="pointer" onClick={(entry) => openDrilldown("Applications by Assistance Type", entry)} />
+              <Bar dataKey="value" name="Applications" fill="#7c3aed" radius={[0, 4, 4, 0]} cursor="pointer" />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Applications & Grants by Month" hasData={monthlyCounts.length > 0}>
+        <ChartCard
+          title="Applications & Grants by Month"
+          hasData={monthlyCounts.length > 0}
+          groups={monthlyCounts}
+          onSelect={(group) => setDrilldown({ chart: "Applications & Grants by Month", group })}
+        >
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={monthlyCounts} margin={{ top: 8, right: 8, left: -12, bottom: 12 }}>
+            <ComposedChart data={monthlyCounts} margin={{ top: 8, right: 8, left: -12, bottom: 12 }} onClick={(entry) => openDrilldown("Applications & Grants by Month", entry)}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
               <YAxis yAxisId="applications" allowDecimals={false} />
@@ -118,7 +133,6 @@ export default function Dashboard({ records, onView }: DashboardProps) {
                 fill="#2563eb"
                 radius={[4, 4, 0, 0]}
                 cursor="pointer"
-                onClick={(entry) => openDrilldown("Applications & Grants by Month", entry)}
               />
               <Line
                 yAxisId="amount"
@@ -133,38 +147,53 @@ export default function Dashboard({ records, onView }: DashboardProps) {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="First-time vs Returning Applicants" hasData={applicantFrequency.length > 0}>
+        <ChartCard
+          title="First-time vs Returning Applicants"
+          hasData={applicantFrequency.length > 0}
+          groups={applicantFrequency}
+          onSelect={(group) => setDrilldown({ chart: "First-time vs Returning Applicants", group })}
+        >
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={applicantFrequency} layout="vertical" margin={{ top: 36, right: 24, left: 24, bottom: 36 }}>
+            <BarChart data={applicantFrequency} layout="vertical" margin={{ top: 36, right: 24, left: 24, bottom: 36 }} onClick={(entry) => openDrilldown("First-time vs Returning Applicants", entry)}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" allowDecimals={false} />
               <YAxis type="category" dataKey="name" width={112} tick={{ fontSize: 11 }} />
               <Tooltip content={<ApplicantChartTooltip />} />
-              <Bar dataKey="value" name="Applicants" fill="#0891b2" radius={[0, 4, 4, 0]} cursor="pointer" onClick={(entry) => openDrilldown("First-time vs Returning Applicants", entry)} />
+              <Bar dataKey="value" name="Applicants" fill="#0891b2" radius={[0, 4, 4, 0]} cursor="pointer" />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Applicants by Age Group" hasData={ageGroups.length > 0}>
+        <ChartCard
+          title="Applicants by Age Group"
+          hasData={ageGroups.length > 0}
+          groups={ageGroups}
+          onSelect={(group) => setDrilldown({ chart: "Applicants by Age Group", group })}
+        >
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={ageGroups} layout="vertical" margin={{ top: 8, right: 16, left: 12, bottom: 8 }}>
+            <BarChart data={ageGroups} layout="vertical" margin={{ top: 8, right: 16, left: 12, bottom: 8 }} onClick={(entry) => openDrilldown("Applicants by Age Group", entry)}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" allowDecimals={false} />
               <YAxis type="category" dataKey="name" width={92} tick={{ fontSize: 10 }} />
               <Tooltip content={<ApplicantChartTooltip />} />
-              <Bar dataKey="value" name="Applicants" fill="#d97706" radius={[0, 4, 4, 0]} cursor="pointer" onClick={(entry) => openDrilldown("Applicants by Age Group", entry)} />
+              <Bar dataKey="value" name="Applicants" fill="#d97706" radius={[0, 4, 4, 0]} cursor="pointer" />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Amount Granted by Barangay" hasData={barangayAmounts.length > 0}>
+        <ChartCard
+          title="Amount Granted by Barangay"
+          hasData={barangayAmounts.length > 0}
+          groups={barangayAmounts.slice(0, 16)}
+          onSelect={(group) => setDrilldown({ chart: "Amount Granted by Barangay", group })}
+        >
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={barangayAmounts.slice(0, 16)} layout="vertical" margin={{ top: 8, right: 16, left: 12, bottom: 8 }}>
+            <BarChart data={barangayAmounts.slice(0, 16)} layout="vertical" margin={{ top: 8, right: 16, left: 12, bottom: 8 }} onClick={(entry) => openDrilldown("Amount Granted by Barangay", entry)}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" tickFormatter={compactMoney} />
               <YAxis type="category" dataKey="name" width={92} tick={{ fontSize: 10 }} />
               <Tooltip content={<ApplicantChartTooltip currency />} />
-              <Bar dataKey="value" name="Amount granted" fill="#16a34a" radius={[0, 4, 4, 0]} cursor="pointer" onClick={(entry) => openDrilldown("Amount Granted by Barangay", entry)} />
+              <Bar dataKey="value" name="Amount granted" fill="#16a34a" radius={[0, 4, 4, 0]} cursor="pointer" />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -186,16 +215,48 @@ export default function Dashboard({ records, onView }: DashboardProps) {
   );
 }
 
-function ChartCard({ title, hasData, children }: { title: string; hasData: boolean; children: React.ReactNode }) {
+function ChartCard({
+  title,
+  hasData,
+  groups,
+  onSelect,
+  children,
+}: {
+  title: string;
+  hasData: boolean;
+  groups: ChartDatum[];
+  onSelect: (group: ChartDatum) => void;
+  children: React.ReactNode;
+}) {
   return (
     <article className="chart-card">
       <div className="chart-card-heading">
         <h3>{title}</h3>
-        {hasData && <span>Hover for summary · Click to view</span>}
+        {hasData && <span>Hover for summary</span>}
       </div>
       <div className="chart-area">
         {hasData ? children : <div className="chart-empty">No matching data to display.</div>}
       </div>
+      {hasData && (
+        <label className="chart-open-control">
+          <span>Open application list</span>
+          <select
+            aria-label={`${title}: open application list`}
+            value=""
+            onChange={(event) => {
+              const group = groups[Number(event.target.value)];
+              if (group) onSelect(group);
+            }}
+          >
+            <option value="">Choose a category…</option>
+            {groups.map((group, index) => (
+              <option value={index} key={group.key || `${group.name}-${index}`}>
+                {group.name} · {group.value.toLocaleString()} {group.unit || "applications"}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
     </article>
   );
 }
@@ -356,8 +417,17 @@ function titleCase(value: string): string {
 
 function chartDatumFromEvent(value: unknown): ChartDatum | null {
   if (!value || typeof value !== "object") return null;
-  const entry = value as { payload?: unknown; records?: unknown };
-  const candidate = entry.payload && typeof entry.payload === "object" ? entry.payload : entry;
+  const entry = value as {
+    activePayload?: Array<{ payload?: unknown }>;
+    payload?: unknown;
+    records?: unknown;
+  };
+  const activePayload = entry.activePayload?.[0]?.payload;
+  const candidate = activePayload && typeof activePayload === "object"
+    ? activePayload
+    : entry.payload && typeof entry.payload === "object"
+      ? entry.payload
+      : entry;
   if (!("records" in candidate) || !Array.isArray(candidate.records)) return null;
   return candidate as ChartDatum;
 }
@@ -387,7 +457,7 @@ function ApplicantChartTooltip({
       )}
       {!currency && group.amount !== undefined && <TooltipMetric label="Total granted" value={money(group.amount)} />}
       {group.average !== undefined && <TooltipMetric label="Average grant" value={money(group.average)} />}
-      <small>Click to view applications</small>
+      <small>Click anywhere in this highlighted area</small>
     </div>
   );
 }

@@ -104,7 +104,10 @@ h1 { color: #063f24; font-size: clamp(1.25rem, 2vw, 1.65rem); line-height: 1.2; 
 .chart-card h3 { color: var(--text); font-size: .95rem; }
 .chart-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .chart-card-heading span { color: #1d4ed8; font-size: .68rem; font-weight: 700; white-space: nowrap; }
-.chart-area { width: 100%; height: 300px; }
+.chart-area { width: 100%; height: 300px; cursor: pointer; }
+.chart-open-control { display: grid; grid-template-columns: auto minmax(180px, 1fr); align-items: center; gap: 10px; margin-top: 10px; padding: 9px 10px; border: 1px solid #bfdbfe; border-radius: 8px; background: #eff6ff; }
+.chart-open-control > span { color: #1d4ed8; font-size: .7rem; font-weight: 800; }
+.chart-open-control select { width: 100%; min-width: 0; height: 36px; padding: 6px 9px; border: 1px solid #93c5fd; border-radius: 7px; background: white; color: var(--text); font: inherit; font-size: .74rem; font-weight: 700; cursor: pointer; }
 .chart-empty { display: grid; height: 100%; place-items: center; border: 1px dashed var(--border); border-radius: var(--radius); background: #f8fafc; color: var(--muted); font-size: .85rem; text-align: center; }
 .applicant-chart-tooltip { display: grid; min-width: 190px; max-width: 230px; gap: 7px; padding: 11px 12px; border: 1px solid #bfdbfe; border-radius: 9px; background: #fffffff7; box-shadow: 0 10px 24px #17251d24; color: var(--text); font-size: .75rem; }
 .applicant-chart-tooltip > strong { padding-bottom: 6px; border-bottom: 1px solid #e2e8f0; color: #1d4ed8; font-size: .82rem; }
@@ -578,6 +581,7 @@ textarea { resize: vertical; }
   .application-date-filter { grid-template-columns: 1fr 1fr; }
   .application-date-filter > div { grid-column: 1 / -1; }
   .chart-grid { grid-template-columns: 1fr; }
+  .chart-open-control { grid-template-columns: 1fr; }
   .condition-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .condition-review-row { grid-template-columns: 1fr; }
   .applicant-history-alert { align-items: flex-start; flex-direction: column; }
