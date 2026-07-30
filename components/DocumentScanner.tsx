@@ -155,7 +155,7 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
                         {household.confirmedConnections.length > 0
                           ? <span className="scanner-household confirmed">{household.confirmedConnections.length} confirmed</span>
                           : household.possibleConnections.length > 0
-                            ? <span className="scanner-household possible">{household.possibleConnections.length} possible relative{household.possibleConnections.length === 1 ? "" : "s"}</span>
+                            ? <span className="scanner-household possible">{household.possibleConnections.length} family match{household.possibleConnections.length === 1 ? "" : "es"} to review</span>
                             : <span className="scanner-household none">None found</span>}
                       </td>
                       <td>

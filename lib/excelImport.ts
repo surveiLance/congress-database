@@ -123,6 +123,7 @@ function mapMaipRow(
     familyComposition: [],
     confirmedRelativeKeys: [],
     dismissedRelativeKeys: [],
+    relativeLinks: [],
     totalEmployed: 0,
     monthlyExpenses: 0,
     civilStatus: choiceValue(source.get("CIVIL STATUS"), "Not recorded"),

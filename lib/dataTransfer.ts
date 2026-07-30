@@ -4,7 +4,7 @@ import { applicantIdentityKey } from "./applicantIdentity";
 export const recordFields: (keyof AssistanceRecord)[] = [
   "id", "surname", "firstName", "middleName", "suffix", "birthday", "age",
   "sex", "contact", "idNumber", "brgy", "address", "work", "salary", "employedStatus",
-  "householdMembers", "familyComposition", "confirmedRelativeKeys", "dismissedRelativeKeys",
+  "householdMembers", "familyComposition", "confirmedRelativeKeys", "dismissedRelativeKeys", "relativeLinks",
   "totalEmployed", "monthlyExpenses", "civilStatus", "category",
   "assistanceType", "amountRequested", "amount", "relationship", "benName", "benBday", "benAge",
   "benSex", "benFamilyMember", "benCivilStatus", "benCategory", "diagnosis",

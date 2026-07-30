@@ -6,6 +6,13 @@ export interface FamilyMember {
   birthday: string;
 }
 
+export interface RelativeLink {
+  key: string;
+  relationship: string;
+  householdStatus: "same-household" | "different-household";
+  confirmedAt: string;
+}
+
 export interface LegacyApplicationData {
   sourceFile: string;
   sourceRow: number;
@@ -52,6 +59,7 @@ export interface AssistanceRecord {
   familyComposition: FamilyMember[];
   confirmedRelativeKeys: string[];
   dismissedRelativeKeys: string[];
+  relativeLinks: RelativeLink[];
   totalEmployed: number;
   monthlyExpenses: number;
   civilStatus: string;
@@ -84,7 +92,7 @@ export const emptyRecord: AssistanceRecord = {
   surname: "", firstName: "", middleName: "", suffix: "", birthday: "", age: "",
   sex: "", contact: "", idNumber: "", brgy: "", address: "", work: "", salary: 0,
   employedStatus: "Employed", householdMembers: 0, familyComposition: [],
-  confirmedRelativeKeys: [], dismissedRelativeKeys: [], totalEmployed: 0, monthlyExpenses: 0,
+  confirmedRelativeKeys: [], dismissedRelativeKeys: [], relativeLinks: [], totalEmployed: 0, monthlyExpenses: 0,
   civilStatus: "", category: "", assistanceType: "", amountRequested: 0, amount: 0, relationship: "",
   benName: "", benBday: "", benAge: "", benSex: "", benFamilyMember: "",
   benCivilStatus: "", benCategory: "", diagnosis: "", conditionCategories: [],
@@ -108,6 +116,7 @@ export function normalizeRecord(record: Partial<AssistanceRecord>): AssistanceRe
     familyComposition: normalizeFamilyComposition(record.familyComposition),
     confirmedRelativeKeys: normalizeStringArray(record.confirmedRelativeKeys),
     dismissedRelativeKeys: normalizeStringArray(record.dismissedRelativeKeys),
+    relativeLinks: normalizeRelativeLinks(record.relativeLinks, record.confirmedRelativeKeys),
     totalEmployed: Number(record.totalEmployed) || 0,
     conditionCategories: normalizeConditionCategories(record.conditionCategories),
     conditionOther: record.conditionOther || "",
@@ -120,6 +129,40 @@ export function normalizeRecord(record: Partial<AssistanceRecord>): AssistanceRe
     updatedAt: record.updatedAt || record.createdAt || "",
     archivedAt: record.archivedAt || "",
   };
+}
+
+function normalizeRelativeLinks(
+  value: unknown,
+  legacyConfirmedKeys: unknown,
+): RelativeLink[] {
+  const links = Array.isArray(value)
+    ? value.flatMap((item): RelativeLink[] => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+      const source = item as Record<string, unknown>;
+      const key = String(source.key || "").trim();
+      if (!key) return [];
+      return [{
+        key,
+        relationship: String(source.relationship || ""),
+        householdStatus: source.householdStatus === "different-household"
+          ? "different-household"
+          : "same-household",
+        confirmedAt: String(source.confirmedAt || ""),
+      }];
+    })
+    : [];
+  const known = new Set(links.map((link) => link.key));
+  normalizeStringArray(legacyConfirmedKeys).forEach((key) => {
+    if (!known.has(key)) {
+      links.push({
+        key,
+        relationship: "",
+        householdStatus: "same-household",
+        confirmedAt: "",
+      });
+    }
+  });
+  return links;
 }
 
 function normalizeLegacyApplication(value: unknown): LegacyApplicationData | null {

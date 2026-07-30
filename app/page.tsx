@@ -319,6 +319,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
       ...application,
       confirmedRelativeKeys: [...record.confirmedRelativeKeys],
       dismissedRelativeKeys: [...record.dismissedRelativeKeys],
+      relativeLinks: record.relativeLinks.map((link) => ({ ...link })),
       updatedAt: record.updatedAt,
     })));
     setSelected(record);

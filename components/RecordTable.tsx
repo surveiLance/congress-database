@@ -85,7 +85,7 @@ export default function RecordTable({
                     <span className="household-confirmed-mini">Household: {formatPeso(household.confirmedAssistance)}</span>
                   )}
                   {household.possibleConnections.length > 0 && (
-                    <span className="household-possible-mini">{household.possibleConnections.length} possible relative{household.possibleConnections.length === 1 ? "" : "s"}</span>
+                    <span className="household-possible-mini">{household.possibleConnections.length} family match{household.possibleConnections.length === 1 ? "" : "es"} to review</span>
                   )}
                 </div>
               </td>

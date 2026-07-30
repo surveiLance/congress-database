@@ -4,13 +4,14 @@ import {
   buildApplicantHistories,
   normalizeIdentityPart,
 } from "./applicantIdentity";
-import { AssistanceRecord, FamilyMember } from "./types";
+import { AssistanceRecord, FamilyMember, RelativeLink } from "./types";
 
 export interface HouseholdConnection {
   key: string;
   applicant: AssistanceRecord;
   history: ApplicantHistory;
-  status: "confirmed" | "possible";
+  status: "confirmed" | "related" | "possible";
+  evidenceTier: "strong" | "possible" | "name-only";
   score: number;
   reasons: string[];
   declaredRelationship: string;
@@ -19,7 +20,9 @@ export interface HouseholdConnection {
 export interface HouseholdSummary {
   connections: HouseholdConnection[];
   confirmedConnections: HouseholdConnection[];
+  relatedConnections: HouseholdConnection[];
   possibleConnections: HouseholdConnection[];
+  nameOnlyConnections: HouseholdConnection[];
   confirmedPeople: number;
   confirmedApplications: number;
   confirmedAssistance: number;
@@ -39,6 +42,7 @@ export function householdSummaryForRecord(
     familyComposition: mergeFamilyComposition(currentApplications),
     confirmedRelativeKeys: mergeKeys(currentApplications, "confirmedRelativeKeys"),
     dismissedRelativeKeys: mergeKeys(currentApplications, "dismissedRelativeKeys"),
+    relativeLinks: mergeRelativeLinks(currentApplications),
   };
 
   const connections = Array.from(histories.values())
@@ -47,24 +51,31 @@ export function householdSummaryForRecord(
     .filter((connection): connection is HouseholdConnection => Boolean(connection))
     .filter((connection) => !profileRecord.dismissedRelativeKeys.includes(connection.key))
     .sort((first, second) =>
-      Number(second.status === "confirmed") - Number(first.status === "confirmed") ||
+      connectionStatusRank(second.status) - connectionStatusRank(first.status) ||
       second.score - first.score ||
       applicantName(first.applicant).localeCompare(applicantName(second.applicant)),
     )
     .slice(0, 8);
 
   const confirmedConnections = connections.filter((connection) => connection.status === "confirmed");
+  const relatedConnections = connections.filter((connection) => connection.status === "related");
   const possibleConnections = connections.filter((connection) => connection.status === "possible");
   return {
     connections,
     confirmedConnections,
+    relatedConnections,
     possibleConnections,
+    nameOnlyConnections: possibleConnections.filter((connection) => connection.evidenceTier === "name-only"),
     confirmedPeople: 1 + confirmedConnections.length,
     confirmedApplications: (currentHistory?.applicationCount || 1) +
       confirmedConnections.reduce((total, connection) => total + connection.history.applicationCount, 0),
     confirmedAssistance: (currentHistory?.totalGranted || record.amount) +
       confirmedConnections.reduce((total, connection) => total + connection.history.totalGranted, 0),
   };
+}
+
+function connectionStatusRank(status: HouseholdConnection["status"]): number {
+  return status === "confirmed" ? 2 : status === "related" ? 1 : 0;
 }
 
 function scoreHouseholdConnection(
@@ -78,6 +89,7 @@ function scoreHouseholdConnection(
     familyComposition: mergeFamilyComposition(history.records),
     confirmedRelativeKeys: mergeKeys(history.records, "confirmedRelativeKeys"),
     dismissedRelativeKeys: mergeKeys(history.records, "dismissedRelativeKeys"),
+    relativeLinks: mergeRelativeLinks(history.records),
   };
   const candidateKey = history.key;
   const reasons: string[] = [];
@@ -151,19 +163,40 @@ function scoreHouseholdConnection(
     applicantProfile.confirmedRelativeKeys.includes(currentKey) &&
     !applicantProfile.dismissedRelativeKeys.includes(currentKey)
   );
+  const storedLink = record.relativeLinks.find((link) => link.key === candidateKey) ||
+    applicantProfile.relativeLinks.find((link) => link.key === currentKey);
+  const relatedDifferentHousehold = storedLink?.householdStatus === "different-household";
   if (confirmed && !reasons.length) reasons.push("Relationship confirmed by staff");
   const hasFamilyEvidence = hasNameLink || Boolean(declaredMember) || Boolean(reverseMember);
-  if (!confirmed && (!hasFamilyEvidence || score < 52)) return null;
+  if (!confirmed && !relatedDifferentHousehold && (!hasFamilyEvidence || score < 52)) return null;
+
+  const hasSupportingEvidence = Boolean(declaredMember || reverseMember || sameAddress || sameContact);
+  const evidenceTier: HouseholdConnection["evidenceTier"] = confirmed || relatedDifferentHousehold || declaredMember || reverseMember
+    ? "strong"
+    : hasSupportingEvidence || (sameSurname && sameMiddleName)
+      ? "possible"
+      : "name-only";
 
   return {
     key: candidateKey,
     applicant,
     history,
-    status: confirmed ? "confirmed" : "possible",
+    status: confirmed ? "confirmed" : relatedDifferentHousehold ? "related" : "possible",
+    evidenceTier,
     score: Math.min(100, score),
     reasons: Array.from(new Set(reasons)),
-    declaredRelationship,
+    declaredRelationship: storedLink?.relationship || declaredRelationship,
   };
+}
+
+function mergeRelativeLinks(records: AssistanceRecord[]): RelativeLink[] {
+  const links = new Map<string, RelativeLink>();
+  records.forEach((application) => {
+    application.relativeLinks.forEach((link) => {
+      if (link.key) links.set(link.key, link);
+    });
+  });
+  return Array.from(links.values());
 }
 
 function findDeclaredMember(family: FamilyMember[], applicant: AssistanceRecord): FamilyMember | null {
