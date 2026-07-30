@@ -29,6 +29,17 @@ interface Props {
 }
 
 const barangays = ["Dela Paz", "San Isidro", "Sta.cruz", "Bagong Nayon", "Mambugan", "Mayamot", "Beverly Hills", "Muntindilaw"];
+const familyRelationships = [
+  "Husband", "Wife", "Partner",
+  "Son", "Daughter", "Stepson", "Stepdaughter",
+  "Father", "Mother", "Stepfather", "Stepmother",
+  "Brother", "Sister", "Half-brother", "Half-sister",
+  "Father-in-law", "Mother-in-law", "Brother-in-law", "Sister-in-law",
+  "Son-in-law", "Daughter-in-law",
+  "Grandfather", "Grandmother", "Grandson", "Granddaughter",
+  "Uncle", "Aunt", "Nephew", "Niece", "Cousin",
+  "Guardian", "Other relative", "Non-relative household member",
+];
 const NEW_APPLICATION_DRAFT_KEY = "new-application";
 
 function ageFromBirthday(value: string) {
@@ -426,13 +437,13 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                         />
                       </label>
                       <label>
-                        <span>Relationship</span>
-                        <select value={member.relationship} onChange={(event) => updateFamilyMember(index, "relationship", event.target.value)}>
-                          <option value="">Select</option>
-                          {["Spouse", "Parent", "Child", "Sibling", "Grandparent", "Grandchild", "Guardian", "Other"].map((option) => (
-                            <option value={option} key={option}>{option}</option>
-                          ))}
-                        </select>
+                        <span>Exact relationship</span>
+                        <input
+                          list="family-relationship-options"
+                          value={member.relationship}
+                          placeholder="e.g. Daughter, Mother-in-law"
+                          onChange={(event) => updateFamilyMember(index, "relationship", event.target.value)}
+                        />
                       </label>
                       <label>
                         <span>Birthday (if known)</span>
@@ -441,6 +452,9 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                       <button className="family-member-remove" type="button" onClick={() => removeFamilyMember(index)} aria-label={`Remove family member ${index + 1}`}>&times;</button>
                     </div>
                   ))}
+                  <datalist id="family-relationship-options">
+                    {familyRelationships.map((relationship) => <option value={relationship} key={relationship} />)}
+                  </datalist>
                   {form.familyComposition.length > 0 && (
                     <button
                       className="family-count-helper"
