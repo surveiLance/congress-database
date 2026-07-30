@@ -99,25 +99,25 @@ function scoreHouseholdConnection(
     reasons.push("Applicant is listed in their family composition");
   }
 
+  const sameSurname = usableSurname(record.surname) &&
+    usableSurname(record.surname) === usableSurname(applicant.surname);
+  if (sameSurname) {
+    score += 48;
+    reasons.push("Same surname");
+  }
+
   const sameAddress = normalizedAddress(record.address) &&
     normalizedAddress(record.address) === normalizedAddress(applicant.address);
-  if (sameAddress) {
-    score += 38;
+  if (sameAddress && (sameSurname || declaredMember || reverseMember)) {
+    score += 24;
     reasons.push("Same recorded address");
   }
 
   const sameContact = normalizedContact(record.contact) &&
     normalizedContact(record.contact) === normalizedContact(applicant.contact);
-  if (sameContact) {
-    score += 38;
+  if (sameContact && (sameSurname || declaredMember || reverseMember)) {
+    score += 28;
     reasons.push("Same contact number");
-  }
-
-  const sameSurname = normalizeIdentityPart(record.surname) &&
-    normalizeIdentityPart(record.surname) === normalizeIdentityPart(applicant.surname);
-  if (sameSurname && (sameAddress || sameContact || declaredMember || reverseMember)) {
-    score += 12;
-    reasons.push("Same surname");
   }
 
   const confirmed = (
@@ -128,7 +128,8 @@ function scoreHouseholdConnection(
     !applicantProfile.dismissedRelativeKeys.includes(currentKey)
   );
   if (confirmed && !reasons.length) reasons.push("Relationship confirmed by staff");
-  if (!confirmed && score < 35) return null;
+  const hasFamilyEvidence = sameSurname || Boolean(declaredMember) || Boolean(reverseMember);
+  if (!confirmed && (!hasFamilyEvidence || score < 45)) return null;
 
   return {
     key: candidateKey,
@@ -178,13 +179,27 @@ function mergeKeys(
 }
 
 function normalizedAddress(value: string): string {
-  return normalizeIdentityPart(value)
+  const normalized = normalizeIdentityPart(value)
     .replace(/\b(?:street|st|road|rd|avenue|ave|barangay|brgy)\b/g, "")
     .replace(/\s+/g, " ")
     .trim();
+  const genericLocations = new Set([
+    "antipolo",
+    "antipolocity",
+    "cityofantipolo",
+    "notrecorded",
+    "na",
+    "none",
+  ]);
+  return genericLocations.has(normalized) ? "" : normalized;
 }
 
 function normalizedContact(value: string): string {
   const digits = String(value || "").replace(/\D/g, "");
   return digits.length >= 7 ? digits.slice(-10) : "";
+}
+
+function usableSurname(value: string): string {
+  const normalized = normalizeIdentityPart(value);
+  return ["", "notrecorded", "na", "none", "unknown"].includes(normalized) ? "" : normalized;
 }

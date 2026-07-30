@@ -70,6 +70,10 @@ Every assistance request remains a separate application, while surname, first na
 
 Applications can include a compact family-composition list with names, relationships, and optional birthdays. The system suggests possible related applicants using declared family members, shared addresses, contact numbers, and surnames, while requiring staff to confirm or dismiss every relationship. Confirmed household assistance totals appear in applicant history and document matching. Existing records remain compatible and load with an empty family list.
 
+Possible-relative suggestions are surname-first. An exact shared address,
+barangay, or contact detail never creates a suggestion on its own; those details
+only support a matching surname or an explicitly listed family member.
+
 ## Dashboard reports
 
 Summary cards and aggregate charts update from the same searched and filtered IndexedDB records shown in the table. Charts use broad categories without applicant names or contact information. Use **Print Report** to print or save the dashboard as a PDF through the browser.

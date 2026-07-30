@@ -78,7 +78,7 @@ export default function HouseholdConnections({
         <div>
           <span className="eyebrow">Household check</span>
           <h3 id="household-connections-title">Family & Related Applicants</h3>
-          <p>Suggestions help staff review assistance history. They do not automatically prove a relationship.</p>
+          <p>Suggestions start with matching surnames or names explicitly listed by the family. Address and contact details only strengthen a match; they never create one by themselves.</p>
         </div>
         <div className="household-total">
           <span>Confirmed household assistance</span>

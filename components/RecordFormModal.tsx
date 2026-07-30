@@ -95,6 +95,7 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
 
   const householdReview = useMemo(() => {
     const hasHouseholdClue = Boolean(
+      form.surname.trim() ||
       form.address.trim() ||
       form.contact.trim() ||
       form.familyComposition.some((member) => member.fullName.trim()),
@@ -448,7 +449,7 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                   </div>
                   {!form.familyComposition.length && (
                     <div className="family-composition-empty">
-                      No names provided. The system will still check exact shared addresses and contact numbers.
+                      No names provided. The system checks matching surnames first; exact addresses and contact numbers are supporting evidence only.
                     </div>
                   )}
                   {form.familyComposition.map((member, index) => (
