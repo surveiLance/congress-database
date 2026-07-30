@@ -2,6 +2,7 @@ import { AssistanceRecord, normalizeRecord } from "./types";
 import { normalizeIdentityPart, standardizeApplicantText } from "./applicantIdentity";
 import {
   addRecord as addLocalRecord,
+  addRecords as addLocalRecords,
   deleteRecord as deleteLocalRecord,
   getRecords as getLocalRecords,
   updateRecord as updateLocalRecord,
@@ -19,13 +20,21 @@ export const usesSharedDatabase = isSupabaseConfigured;
 export async function getRecords(): Promise<AssistanceRecord[]> {
   if (!isSupabaseConfigured) return getLocalRecords();
 
-  const { data, error } = await getSupabaseClient()
-    .from("assistance_records")
-    .select("id, record")
-    .order("created_at", { ascending: false });
+  const rows: SharedRecordRow[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await getSupabaseClient()
+      .from("assistance_records")
+      .select("id, record")
+      .order("created_at", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(databaseMessage(error.message));
+    const page = (data || []) as SharedRecordRow[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
 
-  if (error) throw new Error(databaseMessage(error.message));
-  return ((data || []) as SharedRecordRow[]).map((row) =>
+  return rows.map((row) =>
     normalizeRecord({ ...row.record, id: Number(row.id) }),
   );
 }
@@ -43,6 +52,45 @@ export async function addRecord(record: AssistanceRecord): Promise<void> {
     updated_by: user.id,
   });
   if (error) throw new Error(databaseMessage(error.message));
+}
+
+export async function addRecords(
+  records: AssistanceRecord[],
+  onProgress?: (completed: number, total: number) => void,
+): Promise<{ imported: number; failed: number }> {
+  if (!records.length) return { imported: 0, failed: 0 };
+  const standardized = records.map(standardizeApplicantText);
+  if (!isSupabaseConfigured) {
+    try {
+      await addLocalRecords(standardized);
+      onProgress?.(standardized.length, standardized.length);
+      return { imported: standardized.length, failed: 0 };
+    } catch {
+      return { imported: 0, failed: standardized.length };
+    }
+  }
+
+  const client = getSupabaseClient();
+  const user = await requireUser();
+  const batchSize = 200;
+  let imported = 0;
+  let failed = 0;
+  for (let index = 0; index < standardized.length; index += batchSize) {
+    const batch = standardized.slice(index, index + batchSize);
+    const { error } = await client.from("assistance_records").insert(batch.map((record) => ({
+      ...toSharedPayload(record),
+      created_by: user.id,
+      updated_by: user.id,
+    })));
+    if (error) {
+      console.error("Bulk import batch failed:", error);
+      failed += batch.length;
+    } else {
+      imported += batch.length;
+    }
+    onProgress?.(Math.min(index + batch.length, standardized.length), standardized.length);
+  }
+  return { imported, failed };
 }
 
 export async function updateRecord(record: AssistanceRecord): Promise<void> {
@@ -74,16 +122,21 @@ export function subscribeToRecordChanges(onChange: () => void): () => void {
   if (!isSupabaseConfigured) return () => undefined;
 
   const client = getSupabaseClient();
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
   const channel = client
     .channel("assistance-record-updates")
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "assistance_records" },
-      onChange,
+      () => {
+        if (refreshTimer) clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(onChange, 400);
+      },
     )
     .subscribe();
 
   return () => {
+    if (refreshTimer) clearTimeout(refreshTimer);
     void client.removeChannel(channel);
   };
 }

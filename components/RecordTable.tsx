@@ -47,10 +47,10 @@ export default function RecordTable({
               />
             </th>
           )}
-          <th>Full Name</th><th>Birthday / Age</th><th>Barangay</th><th>Assistance Type</th><th>This Grant</th><th>Applicant History</th><th>Action</th>
+          <th>Full Name</th><th>Application Date</th><th>Birthday / Age</th><th>Barangay</th><th>Assistance Type</th><th>This Grant</th><th>Applicant History</th><th>Action</th>
         </tr></thead>
         <tbody>
-          {!records.length && <tr><td colSpan={onToggleSelected ? 8 : 7} className="empty">No records found.</td></tr>}
+          {!records.length && <tr><td colSpan={onToggleSelected ? 9 : 8} className="empty">No records found.</td></tr>}
           {records.map((record) => {
             const history = histories.get(applicantIdentityKey(record));
             const household = householdSummaryForRecord(record, allRecords);
@@ -69,6 +69,7 @@ export default function RecordTable({
                 </td>
               )}
               <td><strong>{record.surname}, {record.firstName} {record.middleName} {record.suffix}</strong></td>
+              <td>{record.applicationDate || record.createdAt.slice(0, 10) || "—"}</td>
               <td>{record.birthday} ({record.age} yrs)</td>
               <td>{record.brgy}</td>
               <td>{record.assistanceType}</td>

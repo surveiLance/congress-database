@@ -9,9 +9,10 @@ import {
   parseJsonImport,
   recordsToCsv,
 } from "@/lib/dataTransfer";
-import { addRecord, updateRecord, usesSharedDatabase } from "@/lib/recordStore";
+import { ExcelImportSummary, parseMaipExcelImport } from "@/lib/excelImport";
+import { addRecords, updateRecord, usesSharedDatabase } from "@/lib/recordStore";
 
-type ImportFormat = "JSON" | "CSV";
+type ImportFormat = "JSON" | "CSV" | "Excel";
 
 interface ImportResult {
   imported: number;
@@ -22,11 +23,14 @@ interface ImportResult {
 export default function DataTransfer({ records, onChanged }: { records: AssistanceRecord[]; onChanged: () => Promise<void> }) {
   const jsonInput = useRef<HTMLInputElement>(null);
   const csvInput = useRef<HTMLInputElement>(null);
+  const excelInput = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<ImportPreviewRow[] | null>(null);
   const [format, setFormat] = useState<ImportFormat>("JSON");
   const [fileName, setFileName] = useState("");
   const [overwrite, setOverwrite] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [progress, setProgress] = useState("");
+  const [excelSummary, setExcelSummary] = useState<ExcelImportSummary | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -49,14 +53,17 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
     setResult(null);
     setOverwrite(false);
     try {
-      const text = await file.text();
-      const rows = selectedFormat === "JSON" ? parseJsonImport(text) : parseCsvImport(text);
+      const parsedExcel = selectedFormat === "Excel" ? await parseMaipExcelImport(file) : null;
+      const text = parsedExcel ? "" : await file.text();
+      const rows = parsedExcel?.rows || (selectedFormat === "JSON" ? parseJsonImport(text) : parseCsvImport(text));
       if (!rows.length) throw new Error("The selected file contains no records.");
       setFormat(selectedFormat);
       setFileName(file.name);
+      setExcelSummary(parsedExcel?.summary || null);
       setPreview(createImportPreview(rows, records));
     } catch (error) {
       setPreview(null);
+      setExcelSummary(null);
       setMessage({ type: "error", text: error instanceof Error ? error.message : "The selected file could not be read." });
     }
   };
@@ -69,44 +76,57 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
     }
 
     setImporting(true);
-    let imported = 0;
-    let failed = preview.filter((row) => row.status === "failed").length;
-    let skipped = 0;
+    setProgress("Preparing import...");
+    try {
+      let imported = 0;
+      let failed = preview.filter((row) => row.status === "failed").length;
+      const skipped = preview.filter((row) => row.status === "duplicate" && (!overwrite || row.duplicateId === undefined)).length;
 
-    for (const row of preview) {
-      if (!row.record || row.status === "failed") continue;
-      const canOverwrite = row.status === "duplicate" && row.duplicateId !== undefined;
-      if (row.status === "duplicate" && (!overwrite || !canOverwrite)) {
-        skipped += 1;
-        continue;
-      }
-      try {
-        if (canOverwrite) {
+      const readyRecords = preview.flatMap((row) => row.status === "ready" && row.record ? [row.record] : []);
+      const bulkResult = await addRecords(readyRecords, (completed, total) => {
+        setProgress(`Saving ${completed.toLocaleString()} of ${total.toLocaleString()} new applications...`);
+      });
+      imported += bulkResult.imported;
+      failed += bulkResult.failed;
+
+      const overwriteRows = overwrite
+        ? preview.filter((row) => row.status === "duplicate" && row.record && row.duplicateId !== undefined)
+        : [];
+      for (let index = 0; index < overwriteRows.length; index += 1) {
+        const row = overwriteRows[index];
+        if (!row.record || row.duplicateId === undefined) continue;
+        try {
+          setProgress(`Updating ${index + 1} of ${overwriteRows.length} confirmed duplicate applications...`);
           await updateRecord({ ...row.record, id: row.duplicateId });
-        } else {
-          await addRecord(row.record);
+          imported += 1;
+        } catch (error) {
+          console.error("Import row failed:", error);
+          failed += 1;
         }
-        imported += 1;
-      } catch (error) {
-        console.error("Import row failed:", error);
-        failed += 1;
       }
-    }
 
-    await onChanged();
-    const importResult = { imported, skipped, failed };
-    setResult(importResult);
-    setImporting(false);
-    setMessage({
-      type: failed ? "error" : "success",
-      text: `Import complete: ${imported} imported, ${skipped} skipped, ${failed} failed.`,
-    });
+      await onChanged();
+      const importResult = { imported, skipped, failed };
+      setResult(importResult);
+      setMessage({
+        type: failed ? "error" : "success",
+        text: `Import complete: ${imported} imported, ${skipped} skipped, ${failed} failed.`,
+      });
+    } catch (error) {
+      console.error("Import failed:", error);
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "The import could not be completed." });
+    } finally {
+      setImporting(false);
+      setProgress("");
+    }
   };
 
   const closePreview = () => {
     setPreview(null);
     setResult(null);
     setOverwrite(false);
+    setExcelSummary(null);
+    setProgress("");
   };
 
   const counts = preview ? {
@@ -127,8 +147,10 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
           <button className="btn secondary" onClick={() => jsonInput.current?.click()}>Import JSON</button>
           <button className="btn secondary" onClick={exportCsv}>Export CSV</button>
           <button className="btn secondary" onClick={() => csvInput.current?.click()}>Import CSV</button>
+          <button className="btn" onClick={() => excelInput.current?.click()}>Import MAIP Excel</button>
           <input ref={jsonInput} className="sr-only" type="file" accept=".json,application/json" onChange={(event) => void selectFile(event, "JSON")} />
           <input ref={csvInput} className="sr-only" type="file" accept=".csv,text/csv" onChange={(event) => void selectFile(event, "CSV")} />
+          <input ref={excelInput} className="sr-only" type="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" onChange={(event) => void selectFile(event, "Excel")} />
         </div>
       </section>
       {message && <div className={`notice ${message.type}`} role={message.type === "error" ? "alert" : "status"}>{message.text}</div>}
@@ -146,16 +168,27 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
               <span className="count duplicate">{counts.duplicate} duplicate</span>
               <span className="count failed">{counts.failed} failed</span>
             </div>
+            {excelSummary && (
+              <div className="excel-import-summary">
+                <strong>{excelSummary.sourceRows.toLocaleString()} workbook rows reviewed</strong>
+                <span>
+                  Application dates: {excelSummary.firstApplicationDate || "not recorded"} to {excelSummary.lastApplicationDate || "not recorded"}.
+                  Existing applications and duplicates inside the file will be skipped unless you explicitly allow overwriting.
+                </span>
+              </div>
+            )}
 
             <div className="table-container import-preview-table">
               <table>
-                <thead><tr><th>Row</th><th>Applicant</th><th>Birthday</th><th>Status</th><th>Details</th></tr></thead>
+                <thead><tr><th>Row</th><th>Applicant</th><th>Application Date</th><th>Assistance</th><th>Amount</th><th>Status</th><th>Details</th></tr></thead>
                 <tbody>
-                  {preview.map((row) => (
+                  {preview.slice(0, 150).map((row) => (
                     <tr key={row.rowNumber}>
                       <td>{row.rowNumber}</td>
                       <td>{row.record ? `${row.record.surname}, ${row.record.firstName} ${row.record.middleName}`.trim() : "Invalid row"}</td>
-                      <td>{row.record?.birthday || "—"}</td>
+                      <td>{row.record?.applicationDate || row.record?.createdAt.slice(0, 10) || "—"}</td>
+                      <td>{row.record?.assistanceType || "—"}</td>
+                      <td>{row.record ? `₱${row.record.amount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}` : "—"}</td>
                       <td><span className={`status-badge ${row.status}`}>{row.status}</span></td>
                       <td>{row.errors.join(" ") || "Valid and ready to import."}</td>
                     </tr>
@@ -163,6 +196,7 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
                 </tbody>
               </table>
             </div>
+            {preview.length > 150 && <p className="import-preview-limit">Showing the first 150 rows for a responsive preview. All {preview.length.toLocaleString()} rows are included in the counts and import.</p>}
 
             {counts.duplicate > 0 && (
               <label className="overwrite-option">
@@ -180,7 +214,8 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
 
             <div className="modal-footer">
               <button type="button" className="btn secondary" onClick={closePreview}>{result ? "Close" : "Cancel"}</button>
-              {!result && <button type="button" className="btn" disabled={importing || counts.ready + (overwrite ? counts.duplicate : 0) === 0} onClick={() => void importPreview()}>{importing ? "Importing..." : "Import Records"}</button>}
+              {importing && <span className="import-progress" role="status">{progress}</span>}
+              {!result && <button type="button" className="btn" disabled={importing || counts.ready + (overwrite ? counts.duplicate : 0) === 0} onClick={() => void importPreview()}>{importing ? "Importing..." : `Import ${counts.ready.toLocaleString()} Ready Records`}</button>}
             </div>
           </div>
         </div>

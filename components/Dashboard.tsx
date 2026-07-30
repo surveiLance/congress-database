@@ -225,7 +225,7 @@ function groupSum(records: AssistanceRecord[], getGroup: (record: AssistanceReco
 function groupByMonth(records: AssistanceRecord[]): ChartDatum[] {
   const groups = new Map<string, AssistanceRecord[]>();
   records.forEach((record) => {
-    const date = new Date(record.createdAt);
+    const date = new Date(record.applicationDate || record.createdAt);
     if (Number.isNaN(date.getTime())) return;
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
     groups.set(key, [...(groups.get(key) || []), record]);
@@ -293,7 +293,7 @@ function ChartApplicantModal({
   onView: (record: AssistanceRecord) => void;
 }) {
   const sorted = [...group.records].sort(
-    (first, second) => (Date.parse(second.createdAt) || 0) - (Date.parse(first.createdAt) || 0),
+    (first, second) => (Date.parse(second.applicationDate || second.createdAt) || 0) - (Date.parse(first.applicationDate || first.createdAt) || 0),
   );
   return (
     <div className="modal active" role="dialog" aria-modal="true" aria-labelledby="chart-applicants-title">
@@ -311,10 +311,10 @@ function ChartApplicantModal({
         </div>
         <div className="chart-applicant-list">
           {sorted.map((record) => (
-            <article className="chart-applicant-row" key={record.id ?? `${record.createdAt}-${applicantName(record)}`}>
+            <article className="chart-applicant-row" key={record.id ?? `${record.applicationDate || record.createdAt}-${applicantName(record)}`}>
               <div>
                 <strong>{applicantName(record)}</strong>
-                <span>{record.brgy || "No barangay"} · {formatReportDate(record.createdAt)}</span>
+                <span>{record.brgy || "No barangay"} · {formatReportDate(record.applicationDate || record.createdAt)}</span>
               </div>
               <div>
                 <strong>{money(record.amount)}</strong>

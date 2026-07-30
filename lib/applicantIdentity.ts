@@ -72,7 +72,7 @@ export function buildApplicantHistories(records: AssistanceRecord[]): Map<string
           applicationCount: sorted.length,
           totalGranted: sorted.reduce((sum, application) => sum + application.amount, 0),
           latestApplication: sorted[0],
-          latestApplicationDate: sorted[0]?.createdAt || "",
+          latestApplicationDate: sorted[0]?.applicationDate || sorted[0]?.createdAt || "",
         },
       ];
     }),
@@ -108,5 +108,5 @@ function cleanSpacing(value: string): string {
 }
 
 function recordDate(record: AssistanceRecord): number {
-  return Date.parse(record.createdAt || record.updatedAt || "") || 0;
+  return Date.parse(record.applicationDate || record.createdAt || record.updatedAt || "") || 0;
 }

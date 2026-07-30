@@ -273,6 +273,15 @@ h1 { color: #063f24; font-size: clamp(1.25rem, 2vw, 1.65rem); line-height: 1.2; 
 .archive-info span { font-size: .85rem; }
 .search-input { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius); outline: none; font: inherit; font-size: 1rem; }
 .filters-section { display: grid; gap: 8px; margin-bottom: 12px; }
+.application-date-filter { display: grid; grid-template-columns: minmax(190px, 1fr) minmax(145px, .45fr) minmax(145px, .45fr) auto; align-items: end; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: white; }
+.application-date-filter.has-active { border-color: #67bd86; background: #f0fbf4; box-shadow: inset 4px 0 var(--primary); }
+.application-date-filter > div { display: grid; align-self: center; }
+.application-date-filter > div strong { color: var(--primary); font-size: .86rem; }
+.application-date-filter > div small { color: var(--muted); font-size: .7rem; }
+.application-date-filter label { display: grid; gap: 3px; color: var(--muted); font-size: .68rem; font-weight: 700; }
+.application-date-filter input { padding: 8px; font-size: .8rem; }
+.date-filter-clear { min-height: 36px; padding: 6px 9px; border: 0; background: transparent; color: var(--danger); cursor: pointer; font: inherit; font-size: .72rem; font-weight: 800; }
+.date-filter-clear:hover { text-decoration: underline; }
 .filter-access { display: flex; align-items: center; gap: 12px; padding: 7px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 .filter-access.has-active { border-color: #67bd86; background: #f0fbf4; box-shadow: inset 4px 0 var(--primary); }
 .filter-toggle { display: flex; min-width: 0; flex: 1; align-items: center; gap: 11px; padding: 7px 9px; border: 0; border-radius: 8px; background: transparent; color: var(--text); cursor: pointer; font: inherit; text-align: left; }
@@ -303,6 +312,8 @@ h1 { color: #063f24; font-size: clamp(1.25rem, 2vw, 1.65rem); line-height: 1.2; 
 .filter-footer-actions { display: flex; gap: 8px; }
 .record-results { display: flex; justify-content: flex-end; margin: 0 2px 8px; color: var(--muted); font-size: .85rem; }
 .record-results strong { margin-right: 4px; color: var(--text); }
+.record-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; }
+.record-pagination span { color: var(--muted); font-size: .8rem; }
 .bulk-record-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: #f8fafc; color: var(--muted); font-size: .76rem; }
 .bulk-record-bar.has-selection { border-color: #86c99e; background: #f0fbf4; box-shadow: inset 3px 0 var(--primary); }
 .bulk-select-toggle { flex: 0 0 auto; padding: 5px 8px; border: 1px solid #a9dabb; border-radius: 7px; background: white; color: var(--primary); cursor: pointer; font: inherit; font-size: .73rem; font-weight: 800; }
@@ -477,6 +488,11 @@ textarea { resize: vertical; }
 .count.failed, .status-badge.failed { background: #fee2e2; color: #991b1b; }
 .import-preview-table { max-height: 46vh; overflow: auto; }
 .import-preview-table th { position: sticky; top: 0; z-index: 1; }
+.excel-import-summary { display: grid; gap: 2px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid #bfdbfe; border-radius: var(--radius); background: #eff6ff; }
+.excel-import-summary strong { color: #1d4ed8; font-size: .85rem; }
+.excel-import-summary span, .import-preview-limit, .import-progress { color: var(--muted); font-size: .74rem; }
+.import-preview-limit { margin-top: 7px; }
+.import-progress { align-self: center; margin-right: auto; }
 .overwrite-option { display: flex; align-items: flex-start; gap: 8px; margin-top: 14px; color: #92400e; font-size: .9rem; font-weight: 600; }
 .overwrite-option input { width: auto; margin-top: 4px; }
 .import-result { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 14px; padding: 12px; border-radius: var(--radius); background: #f1f5f9; }
@@ -502,6 +518,8 @@ textarea { resize: vertical; }
   .form-group.full-width { grid-column: auto; }
   .detail-row { grid-template-columns: 1fr; gap: 2px; }
   .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .application-date-filter { grid-template-columns: 1fr 1fr; }
+  .application-date-filter > div { grid-column: 1 / -1; }
   .chart-grid { grid-template-columns: 1fr; }
   .condition-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .condition-review-row { grid-template-columns: 1fr; }
@@ -560,6 +578,9 @@ textarea { resize: vertical; }
   .application-history-item { grid-template-columns: 1fr auto; }
   .application-history-item .history-status { grid-column: 1 / -1; justify-self: start; }
   .filter-grid { grid-template-columns: 1fr; }
+  .application-date-filter { grid-template-columns: 1fr; }
+  .application-date-filter > div { grid-column: auto; }
+  .date-filter-clear { justify-self: start; }
   .filter-access { align-items: stretch; flex-direction: column; gap: 3px; }
   .filter-summary-count { align-self: flex-start; margin: 0 9px 6px 50px; }
   .active-filter-bar { align-items: flex-start; flex-wrap: wrap; }

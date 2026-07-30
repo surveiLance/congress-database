@@ -6,6 +6,30 @@ export interface FamilyMember {
   birthday: string;
 }
 
+export interface LegacyApplicationData {
+  sourceFile: string;
+  sourceRow: number;
+  dateSubmitted: string;
+  systemUpdated: string;
+  payoutStatus: string;
+  repayrollDate: string;
+  repayroll: string;
+  payoutDate: string;
+  district: string;
+  city: string;
+  sourceOfFund: string;
+  purpose: string;
+  beneficiaryDistrict: string;
+  beneficiaryCity: string;
+  beneficiaryBarangay: string;
+  modeOfAssistance: string;
+  admissionMode: string;
+  subcategory: string;
+  status: string;
+  releaseDetails: string;
+  idPresented: string;
+}
+
 export interface AssistanceRecord {
   id?: number;
   surname: string;
@@ -47,6 +71,8 @@ export interface AssistanceRecord {
   remarks: string;
   idImage: string | null;
   idImageBack: string | null;
+  applicationDate: string;
+  legacyApplication: LegacyApplicationData | null;
   createdAt: string;
   updatedAt?: string;
   archivedAt?: string;
@@ -61,6 +87,8 @@ export const emptyRecord: AssistanceRecord = {
   benName: "", benBday: "", benAge: "", benSex: "", benFamilyMember: "",
   benCivilStatus: "", benCategory: "", diagnosis: "", conditionCategories: [],
   conditionOther: "", remarks: "", idImage: null, idImageBack: null,
+  applicationDate: "",
+  legacyApplication: null,
   createdAt: "",
   updatedAt: "",
   archivedAt: "",
@@ -84,9 +112,40 @@ export function normalizeRecord(record: Partial<AssistanceRecord>): AssistanceRe
     idNumber: record.idNumber || "",
     idImage: record.idImage || null,
     idImageBack: record.idImageBack || null,
+    applicationDate: record.applicationDate || String(record.createdAt || "").slice(0, 10),
+    legacyApplication: normalizeLegacyApplication(record.legacyApplication),
     createdAt: record.createdAt || new Date().toISOString(),
     updatedAt: record.updatedAt || record.createdAt || "",
     archivedAt: record.archivedAt || "",
+  };
+}
+
+function normalizeLegacyApplication(value: unknown): LegacyApplicationData | null {
+  const parsed = parsePossibleJson(value);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const source = parsed as Record<string, unknown>;
+  return {
+    sourceFile: String(source.sourceFile || ""),
+    sourceRow: Number(source.sourceRow) || 0,
+    dateSubmitted: String(source.dateSubmitted || ""),
+    systemUpdated: String(source.systemUpdated || ""),
+    payoutStatus: String(source.payoutStatus || ""),
+    repayrollDate: String(source.repayrollDate || ""),
+    repayroll: String(source.repayroll || ""),
+    payoutDate: String(source.payoutDate || ""),
+    district: String(source.district || ""),
+    city: String(source.city || ""),
+    sourceOfFund: String(source.sourceOfFund || ""),
+    purpose: String(source.purpose || ""),
+    beneficiaryDistrict: String(source.beneficiaryDistrict || ""),
+    beneficiaryCity: String(source.beneficiaryCity || ""),
+    beneficiaryBarangay: String(source.beneficiaryBarangay || ""),
+    modeOfAssistance: String(source.modeOfAssistance || ""),
+    admissionMode: String(source.admissionMode || ""),
+    subcategory: String(source.subcategory || ""),
+    status: String(source.status || ""),
+    releaseDetails: String(source.releaseDetails || ""),
+    idPresented: String(source.idPresented || ""),
   };
 }
 

@@ -9,7 +9,7 @@ export const recordFields: (keyof AssistanceRecord)[] = [
   "assistanceType", "amountRequested", "amount", "relationship", "benName", "benBday", "benAge",
   "benSex", "benFamilyMember", "benCivilStatus", "benCategory", "diagnosis",
   "conditionCategories", "conditionOther", "remarks", "idImage", "idImageBack", "createdAt",
-  "updatedAt", "archivedAt",
+  "applicationDate", "legacyApplication", "updatedAt", "archivedAt",
 ];
 
 const requiredFields: (keyof AssistanceRecord)[] = [
@@ -37,7 +37,7 @@ export function duplicateKey(record: Partial<AssistanceRecord>): string {
     firstName: String(record.firstName || ""),
     birthday: String(record.birthday || ""),
   });
-  const applicationDate = String(record.createdAt || "").trim().slice(0, 19);
+  const applicationDate = String(record.applicationDate || record.createdAt || "").trim().slice(0, 10);
   const assistanceType = String(record.assistanceType || "").trim().toLowerCase();
   const amount = Number(record.amount) || 0;
   const requested = Number(record.amountRequested) || 0;
@@ -52,15 +52,18 @@ export function createImportPreview(
   const seenInFile = new Set<string>();
 
   return sourceRows.map((source, index) => {
+    const rowNumber = source && typeof source === "object" && !Array.isArray(source)
+      ? Number((source as { __sourceRow?: unknown }).__sourceRow) || index + 1
+      : index + 1;
     const result = validateRecord(source);
     if (!result.record) {
-      return { rowNumber: index + 1, record: null, status: "failed", errors: result.errors };
+      return { rowNumber, record: null, status: "failed", errors: result.errors };
     }
 
     const key = duplicateKey(result.record);
     if (seenInFile.has(key)) {
       return {
-        rowNumber: index + 1,
+        rowNumber,
         record: result.record,
         status: "duplicate",
         errors: ["Duplicate application within this import file."],
@@ -71,7 +74,7 @@ export function createImportPreview(
     const existingMatch = existing.get(key);
     if (existingMatch) {
       return {
-        rowNumber: index + 1,
+        rowNumber,
         record: result.record,
         status: "duplicate",
         errors: ["Matches an existing application for this applicant, date, assistance type, and amount."],
@@ -79,7 +82,7 @@ export function createImportPreview(
       };
     }
 
-    return { rowNumber: index + 1, record: result.record, status: "ready", errors: [] };
+    return { rowNumber, record: result.record, status: "ready", errors: [] };
   });
 }
 
@@ -106,6 +109,10 @@ function validateRecord(source: unknown): { record: AssistanceRecord | null; err
   const birthday = String(raw.birthday || "");
   if (birthday && !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) {
     errors.push("Birthday must use YYYY-MM-DD format.");
+  }
+  const applicationDate = String(raw.applicationDate || "");
+  if (applicationDate && !/^\d{4}-\d{2}-\d{2}$/.test(applicationDate)) {
+    errors.push("Application date must use YYYY-MM-DD format.");
   }
 
   if (errors.length) return { record: null, errors };

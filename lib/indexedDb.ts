@@ -39,6 +39,23 @@ export async function addRecord(record: AssistanceRecord): Promise<void> {
   });
 }
 
+export async function addRecords(records: AssistanceRecord[]): Promise<void> {
+  if (!records.length) return;
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    records.forEach((record) => {
+      const recordWithoutId = { ...record };
+      delete recordWithoutId.id;
+      store.add(recordWithoutId);
+    });
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
 export async function updateRecord(record: AssistanceRecord): Promise<void> {
   if (record.id === undefined) throw new Error("An existing record ID is required.");
   const database = await openDatabase();

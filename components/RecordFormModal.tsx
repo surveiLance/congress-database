@@ -41,6 +41,8 @@ const familyRelationships = [
   "Guardian", "Other relative", "Non-relative household member",
 ];
 const NEW_APPLICATION_DRAFT_KEY = "new-application";
+const today = () => new Date().toISOString().slice(0, 10);
+const freshRecord = (): AssistanceRecord => ({ ...emptyRecord, applicationDate: today() });
 
 function ageFromBirthday(value: string) {
   if (!value) return "";
@@ -54,7 +56,7 @@ function ageFromBirthday(value: string) {
 }
 
 export default function RecordFormModal({ open, initialRecord, existingRecords, onClose, onSave }: Props) {
-  const [form, setForm] = useState<AssistanceRecord>(() => initialRecord ? { ...initialRecord } : { ...emptyRecord });
+  const [form, setForm] = useState<AssistanceRecord>(() => initialRecord ? { ...initialRecord } : freshRecord());
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [copiedApplicantKey, setCopiedApplicantKey] = useState("");
@@ -110,7 +112,15 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
         if (!active) return;
         setDraftCandidate(draft);
         if (draft) {
-          setForm({ ...draft.record, id: undefined, createdAt: "", updatedAt: "", archivedAt: "" });
+          setForm({
+            ...emptyRecord,
+            ...draft.record,
+            applicationDate: draft.record.applicationDate || today(),
+            id: undefined,
+            createdAt: "",
+            updatedAt: "",
+            archivedAt: "",
+          });
         }
         setDraftSavedAt(draft?.savedAt || "");
         setDraftReady(true);
@@ -250,7 +260,7 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
       await deleteApplicationDraft(NEW_APPLICATION_DRAFT_KEY);
       setDraftCandidate(null);
       setDraftSavedAt("");
-      setForm({ ...emptyRecord });
+      setForm(freshRecord());
       setDraftError("");
     } catch (reason) {
       console.error(reason);
@@ -292,7 +302,7 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
           console.error("The completed application was saved, but its local draft could not be removed.", reason);
         }
       }
-      setForm({ ...emptyRecord });
+      setForm(freshRecord());
       onClose();
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "The record could not be saved.");
@@ -311,7 +321,7 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
         return;
       }
     }
-    setForm({ ...emptyRecord });
+    setForm(freshRecord());
     onClose();
   };
 
@@ -516,7 +526,8 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                 <Field label="Category *"><Select required value={form.category} options={["FHONA", "SENIOR", "PLHIV"]} placeholder="Select Category" onChange={(v) => update("category", v)} /></Field>
 
                 <h3 className="section-title">7. Assistance Granted</h3>
-                <Field label="Type of Assistance *"><Select required value={form.assistanceType} options={["Medical", "Financial", "Educational", "Burial"]} placeholder="Select Type" onChange={(v) => update("assistanceType", v)} /></Field>
+                <Field label="Application Date *"><input required type="date" value={form.applicationDate} onChange={(event) => update("applicationDate", event.target.value)} /></Field>
+                <Field label="Type of Assistance *"><Select required value={form.assistanceType} options={["Medical", "Food", "Financial", "Educational", "Funeral", "Burial", "Cash Relief"]} placeholder="Select Type" onChange={(v) => update("assistanceType", v)} /></Field>
                 <Field label="Amount Requested (₱)"><input type="number" min="0" step=".01" value={form.amountRequested} onFocus={selectInitialZero} onChange={(e) => update("amountRequested", Number(e.target.value))} /></Field>
                 <Field label="Amount Granted (₱) *"><input required type="number" min="0" step=".01" value={form.amount} onFocus={selectInitialZero} onChange={(e) => update("amount", Number(e.target.value))} /></Field>
                 <Field label="Relationship to Beneficiary"><input value={form.relationship} placeholder="e.g. Self, Parent, Child" onChange={(e) => update("relationship", e.target.value)} /></Field>

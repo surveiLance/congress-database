@@ -56,6 +56,25 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
 
   return (
     <section className="filters-section" aria-labelledby="advanced-filters-title">
+      <div className={`application-date-filter${filters.createdFrom || filters.createdTo ? " has-active" : ""}`}>
+        <div>
+          <strong>Application date</strong>
+          <small>Show applications made within a date range</small>
+        </div>
+        <label>
+          <span>From</span>
+          <input type="date" value={filters.createdFrom} onChange={(event) => update("createdFrom", event.target.value)} />
+        </label>
+        <label>
+          <span>To</span>
+          <input type="date" value={filters.createdTo} onChange={(event) => update("createdTo", event.target.value)} />
+        </label>
+        {(filters.createdFrom || filters.createdTo) && (
+          <button className="date-filter-clear" type="button" onClick={() => onChange({ ...filters, createdFrom: "", createdTo: "" })}>
+            Clear dates
+          </button>
+        )}
+      </div>
       <div className={`filter-access${activeFilters.length ? " has-active" : ""}`}>
         <button
           className="filter-toggle"
@@ -116,8 +135,6 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
             <Filter label="Maximum monthly expenses"><MoneyInput value={filters.maxExpenses} onChange={(value) => update("maxExpenses", value)} /></Filter>
             <Filter label="Minimum amount granted"><MoneyInput value={filters.minAmount} onChange={(value) => update("minAmount", value)} /></Filter>
             <Filter label="Maximum amount granted"><MoneyInput value={filters.maxAmount} onChange={(value) => update("maxAmount", value)} /></Filter>
-            <Filter label="Created from"><input type="date" value={filters.createdFrom} onChange={(event) => update("createdFrom", event.target.value)} /></Filter>
-            <Filter label="Created to"><input type="date" value={filters.createdTo} onChange={(event) => update("createdTo", event.target.value)} /></Filter>
             <Filter label="Sort by">
               <select value={filters.sort} onChange={(event) => update("sort", event.target.value)}>
                 <option value="name">Name</option><option value="newest">Newest</option><option value="oldest">Oldest</option>
@@ -167,8 +184,8 @@ function getActiveFilters(filters: RecordFilters): ActiveFilter[] {
   if (filters.maxExpenses) active.push({ field: "maxExpenses", label: `Expenses: up to ${money(filters.maxExpenses)}` });
   if (filters.minAmount) active.push({ field: "minAmount", label: `Granted: ${money(filters.minAmount)}+` });
   if (filters.maxAmount) active.push({ field: "maxAmount", label: `Granted: up to ${money(filters.maxAmount)}` });
-  add("createdFrom", `Created from: ${filters.createdFrom}`);
-  add("createdTo", `Created to: ${filters.createdTo}`);
+  add("createdFrom", `Applied from: ${filters.createdFrom}`);
+  add("createdTo", `Applied to: ${filters.createdTo}`);
   if (filters.sort !== defaultRecordFilters.sort) {
     const labels: Record<RecordSort, string> = {
       name: "Name",

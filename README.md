@@ -40,6 +40,18 @@ applicant information.
 
 The dashboard can export complete JSON backups or CSV files and import either format. Imports are validated and previewed before saving. Matching full names and birthdays are skipped by default; overwriting an existing match requires both selecting the overwrite option and confirming the action.
 
+Utilities also includes **Import MAIP Excel** for the district's `Data` worksheet in
+`.xlsx` or `.xlsm` workbooks. The importer maps the existing MAIP client,
+beneficiary, assistance, amount, date, payout, funding, purpose, diagnosis, ID,
+and remarks columns into backward-compatible records. It previews validation and
+duplicate counts, shows only the first 150 preview rows for performance, and
+saves new shared records to Supabase in batches.
+
+Application records are filtered and sorted by their actual application date.
+The records desk keeps that date filter visible and displays large result sets
+in pages of 50 applications. Shared record loading automatically retrieves every
+Supabase page rather than stopping at the API's first result page.
+
 ## Record management
 
 Active records can be edited or archived. Archived records are excluded from active statistics, search, and document matching, and can be restored from the supervisor archived-records view. Permanent deletion is available only during development and requires typing an explicit confirmation.

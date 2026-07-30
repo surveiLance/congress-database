@@ -50,6 +50,8 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   const [filters, setFilters] = useState<RecordFilters>({ ...defaultRecordFilters });
   const [error, setError] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
+  const [recordPage, setRecordPage] = useState(1);
+  const pageSize = 50;
 
   const refresh = useCallback(async () => {
     try {
@@ -93,13 +95,14 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     const nameQuery = searchTokens(filters.name);
     const diagnosisQuery = searchTokens(filters.diagnosis);
     const matching = visibleRecords.filter((record) => {
+      const legacySearch = record.legacyApplication ? Object.values(record.legacyApplication).join(" ") : "";
       const searchable = normalizeSearchText(Object.values(record)
         .filter((value) => typeof value !== "string" || !value.startsWith("data:image/"))
-        .join(" ") + " " + record.familyComposition.map((member) =>
+        .join(" ") + " " + legacySearch + " " + record.familyComposition.map((member) =>
         `${member.fullName} ${member.relationship} ${member.birthday}`).join(" "));
       const fullName = normalizeSearchText(`${record.surname} ${record.firstName} ${record.middleName} ${record.suffix}`);
       const diagnosis = normalizeSearchText(record.diagnosis);
-      const createdDate = record.createdAt ? record.createdAt.slice(0, 10) : "";
+      const createdDate = record.applicationDate || (record.createdAt ? record.createdAt.slice(0, 10) : "");
 
       return tokensMatch(globalQuery, searchable) &&
         tokensMatch(nameQuery, fullName) &&
@@ -120,6 +123,20 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
 
     return matching.sort((first, second) => compareRecords(first, second, filters.sort));
   }, [filters, query, visibleRecords]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pagedRecords = useMemo(
+    () => filtered.slice((recordPage - 1) * pageSize, recordPage * pageSize),
+    [filtered, recordPage],
+  );
+
+  useEffect(() => {
+    setRecordPage(1);
+  }, [filters, query]);
+
+  useEffect(() => {
+    if (recordPage > pageCount) setRecordPage(pageCount);
+  }, [pageCount, recordPage]);
 
   useEffect(() => {
     const visibleIds = new Set(filtered.flatMap((record) => record.id === undefined ? [] : [record.id]));
@@ -198,6 +215,16 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     setSelectedIds((current) => {
       const next = new Set(current);
       matchingIds.forEach((id) => everyMatchingRecordSelected ? next.delete(id) : next.add(id));
+      return next;
+    });
+  };
+
+  const toggleCurrentPage = () => {
+    const pageIds = pagedRecords.flatMap((record) => record.id === undefined ? [] : [record.id]);
+    const everyPageRecordSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      pageIds.forEach((id) => everyPageRecordSelected ? next.delete(id) : next.add(id));
       return next;
     });
   };
@@ -347,6 +374,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
             {showArchived && <div className="archive-info"><strong>Archived Records</strong><span>Restore an application, or permanently delete it when it should no longer be included in applicant history and reports.</span></div>}
             <div className="record-results" role="status">
               <strong>{filtered.length}</strong> matching record{filtered.length === 1 ? "" : "s"}
+              {filtered.length > pageSize && <span> · showing {(recordPage - 1) * pageSize + 1}–{Math.min(recordPage * pageSize, filtered.length)}</span>}
             </div>
             <div className={`bulk-record-bar${selectedApplications.length ? " has-selection" : ""}`}>
               <button className="bulk-select-toggle" type="button" disabled={!filtered.length} onClick={toggleAllMatching}>
@@ -367,7 +395,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               )}
             </div>
             <RecordTable
-              records={filtered}
+              records={pagedRecords}
               allRecords={records}
               archived={showArchived}
               onView={setSelected}
@@ -377,8 +405,15 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               onPermanentDelete={showArchived ? permanentlyDelete : undefined}
               selectedIds={selectedIds}
               onToggleSelected={toggleSelectedApplication}
-              onToggleAll={toggleAllMatching}
+              onToggleAll={toggleCurrentPage}
             />
+            {filtered.length > pageSize && (
+              <nav className="record-pagination" aria-label="Record pages">
+                <button className="btn secondary small" type="button" disabled={recordPage === 1} onClick={() => setRecordPage((page) => page - 1)}>Previous</button>
+                <span>Page <strong>{recordPage}</strong> of <strong>{pageCount}</strong></span>
+                <button className="btn secondary small" type="button" disabled={recordPage === pageCount} onClick={() => setRecordPage((page) => page + 1)}>Next</button>
+              </nav>
+            )}
         </div>
 
         <div className="workspace-view" hidden={workspace !== "matching"}>
@@ -473,7 +508,7 @@ function compareRecords(first: AssistanceRecord, second: AssistanceRecord, sort:
   }
   if (sort === "amount-high") return second.amount - first.amount;
   if (sort === "amount-low") return first.amount - second.amount;
-  const firstDate = Date.parse(first.createdAt) || 0;
-  const secondDate = Date.parse(second.createdAt) || 0;
+  const firstDate = Date.parse(first.applicationDate || first.createdAt) || 0;
+  const secondDate = Date.parse(second.applicationDate || second.createdAt) || 0;
   return sort === "oldest" ? firstDate - secondDate : secondDate - firstDate;
 }

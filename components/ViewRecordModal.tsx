@@ -46,7 +46,7 @@ export default function ViewRecordModal({
           {applications.map((application) => (
             <article className={`application-history-item${application.id === record.id ? " selected" : ""}`} key={application.id}>
               <div>
-                <strong>{formatTimestamp(application.createdAt, true)}</strong>
+                <strong>{formatTimestamp(application.applicationDate || application.createdAt, true)}</strong>
                 <span>{application.assistanceType || "Unspecified assistance"}</span>
               </div>
               <strong>{formatPeso(application.amount)}</strong>
@@ -64,6 +64,7 @@ export default function ViewRecordModal({
           ["ID Number", record.idNumber || "Not recorded"],
           ["Address & Barangay", `${record.address}, Brgy. ${record.brgy}`],
           ["Civil Status & Category", `${record.civilStatus} | ${record.category}`],
+          ["Application Date", formatTimestamp(record.applicationDate || record.createdAt, true)],
           ["Created", formatTimestamp(record.createdAt)],
           ["Last Updated", formatTimestamp(record.updatedAt)],
           ...(record.archivedAt ? [["Archived", formatTimestamp(record.archivedAt)]] : []),
@@ -88,7 +89,20 @@ export default function ViewRecordModal({
           ...(record.conditionOther ? [["Other Condition", record.conditionOther]] : []),
           ["Remarks", record.remarks || "None"],
         ]} />
-        <h3 className="section-title">5. Attached ID Photos</h3>
+        {record.legacyApplication && (
+          <Details title="5. Imported MAIP Details" rows={[
+            ["Source", `${record.legacyApplication.sourceFile || "MAIP workbook"} · row ${record.legacyApplication.sourceRow || "—"}`],
+            ["Source of Fund", record.legacyApplication.sourceOfFund || "Not recorded"],
+            ["Purpose", record.legacyApplication.purpose || "Not recorded"],
+            ["Date Submitted", record.legacyApplication.dateSubmitted || "Not recorded"],
+            ["Payout", [record.legacyApplication.payoutStatus, record.legacyApplication.payoutDate].filter(Boolean).join(" · ") || "Not recorded"],
+            ["Repayroll", [record.legacyApplication.repayroll, record.legacyApplication.repayrollDate].filter(Boolean).join(" · ") || "Not recorded"],
+            ["Mode / Admission", [record.legacyApplication.modeOfAssistance, record.legacyApplication.admissionMode].filter(Boolean).join(" · ") || "Not recorded"],
+            ["Status / Release", [record.legacyApplication.status, record.legacyApplication.releaseDetails].filter(Boolean).join(" · ") || "Not recorded"],
+            ["ID Presented", record.legacyApplication.idPresented || "Not recorded"],
+          ]} />
+        )}
+        <h3 className="section-title">{record.legacyApplication ? "6" : "5"}. Attached ID Photos</h3>
         {record.idImage || record.idImageBack ? (
           <div className="id-image-grid">
             {record.idImage && (
