@@ -61,7 +61,7 @@ export default function Dashboard({ records, onView }: DashboardProps) {
       <div className="dashboard-heading">
         <div>
           <h2 id="dashboard-title">Dashboard Overview</h2>
-          <p>Aggregated report for {histories.length} unique applicant{histories.length === 1 ? "" : "s"} across {records.length} application{records.length === 1 ? "" : "s"}. Hover over a chart to see names, then click it to open the application list.</p>
+          <p>Aggregated report for {histories.length} unique applicant{histories.length === 1 ? "" : "s"} across {records.length} application{records.length === 1 ? "" : "s"}. Hover for a quick summary, then click a chart to open its application list.</p>
         </div>
         <button className="btn secondary print-hide" type="button" onClick={() => window.print()}>Print Report</button>
       </div>
@@ -191,7 +191,7 @@ function ChartCard({ title, hasData, children }: { title: string; hasData: boole
     <article className="chart-card">
       <div className="chart-card-heading">
         <h3>{title}</h3>
-        {hasData && <span>Hover for names · Click to view</span>}
+        {hasData && <span>Hover for summary · Click to view</span>}
       </div>
       <div className="chart-area">
         {hasData ? children : <div className="chart-empty">No matching data to display.</div>}
@@ -373,18 +373,27 @@ function ApplicantChartTooltip({
 }) {
   const group = payload?.[0]?.payload;
   if (!active || !group) return null;
-  const applicants = uniqueApplicants(group.records);
+  const unit = group.unit || "applications";
   return (
     <div className="applicant-chart-tooltip">
       <strong>{group.name}</strong>
-      <b>{currency ? money(group.value) : `${group.value.toLocaleString()} ${group.unit || "applications"}`}</b>
-      {group.amount !== undefined && <small>Total granted: {money(group.amount)}</small>}
-      {group.average !== undefined && <small>Average grant: {money(group.average)}</small>}
-      <span>{applicants.slice(0, 4).map(applicantName).join(", ")}</span>
-      {applicants.length > 4 && <small>+{applicants.length - 4} more</small>}
-      <small>Click the chart to view details</small>
+      {currency ? (
+        <>
+          <TooltipMetric label="Total granted" value={money(group.value)} />
+          <TooltipMetric label="Applications" value={group.records.length.toLocaleString()} />
+        </>
+      ) : (
+        <TooltipMetric label={titleCase(unit)} value={group.value.toLocaleString()} />
+      )}
+      {!currency && group.amount !== undefined && <TooltipMetric label="Total granted" value={money(group.amount)} />}
+      {group.average !== undefined && <TooltipMetric label="Average grant" value={money(group.average)} />}
+      <small>Click to view applications</small>
     </div>
   );
+}
+
+function TooltipMetric({ label, value }: { label: string; value: string }) {
+  return <div><span>{label}</span><b>{value}</b></div>;
 }
 
 function ChartApplicantModal({
@@ -512,15 +521,6 @@ function ChartApplicantModal({
       </div>
     </div>
   );
-}
-
-function uniqueApplicants(records: AssistanceRecord[]) {
-  const unique = new Map<string, AssistanceRecord>();
-  records.forEach((record) => {
-    const key = `${record.surname}|${record.firstName}|${record.birthday}`.toLocaleLowerCase("en-PH");
-    if (!unique.has(key)) unique.set(key, record);
-  });
-  return Array.from(unique.values());
 }
 
 function uniqueOptions(values: string[]) {
