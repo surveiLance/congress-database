@@ -40,7 +40,6 @@ export default function ViewRecordModal({
             <small>Across all recorded applications</small>
           </div>
         </section>
-        <HouseholdConnections record={record} allRecords={allRecords} onView={onView} onUpdate={onUpdate} />
         <h3 className="section-title">Application History</h3>
         <div className="application-history-list">
           {applications.map((application, index) => (
@@ -63,8 +62,17 @@ export default function ViewRecordModal({
             </button>
           ))}
         </div>
-        <p className="selected-application-label">Selected application details</p>
-        <Details title="1. Applicant Details" rows={[
+        <p className="selected-application-label">Selected application</p>
+        <section className="selected-application-summary" aria-label="Selected application summary">
+          <div><span>Application date</span><strong>{formatTimestamp(record.applicationDate || record.createdAt, true)}</strong></div>
+          <div><span>Assistance</span><strong>{record.assistanceType || "Not recorded"}</strong></div>
+          <div className="selected-grant"><span>Amount granted</span><strong>{formatPeso(record.amount)}</strong></div>
+          <div><span>Beneficiary</span><strong>{record.benName || "Self / applicant"}</strong></div>
+          <div className="selected-application-reason"><span>Diagnosis, purpose, or remarks</span><strong>{record.diagnosis || record.legacyApplication?.purpose || record.remarks || "Not recorded"}</strong></div>
+        </section>
+        <HouseholdConnections record={record} allRecords={allRecords} onView={onView} onUpdate={onUpdate} />
+        <div className="record-detail-groups">
+        <Details title="Applicant details" rows={[
           ["Full Name", `${record.surname}, ${record.firstName} ${record.middleName} ${record.suffix}`],
           ["Birthday / Age / Sex", `${record.birthday} (${record.age} yrs) / ${record.sex}`],
           ["Contact", record.contact],
@@ -76,19 +84,19 @@ export default function ViewRecordModal({
           ["Last Updated", formatTimestamp(record.updatedAt)],
           ...(record.archivedAt ? [["Archived", formatTimestamp(record.archivedAt)]] : []),
         ]} />
-        <Details title="2. Employment & Expenses" rows={[
+        <Details title="Employment & household" rows={[
           ["Work & Salary", `${record.work || "N/A"} (${formatPeso(record.salary)}/mo) - ${record.employedStatus}`],
           ["Total Household Members", record.householdMembers ? String(record.householdMembers) : "Not recorded"],
           ["Employed Household Members", String(record.totalEmployed)],
           ["Monthly Expenses", formatPeso(record.monthlyExpenses)],
         ]} />
-        <Details title="3. Assistance Granted" rows={[
+        <Details title="Assistance details" rows={[
           ["Assistance Type", record.assistanceType],
           ["Amount Requested", formatPeso(record.amountRequested)],
           ["Amount Granted", formatPeso(record.amount)],
           ["Relation to Beneficiary", record.relationship || "Self"],
         ]} />
-        <Details title="4. Beneficiary Details" rows={[
+        <Details title="Beneficiary & medical details" rows={[
           ["Beneficiary Name", record.benName || "N/A"],
           ["Beneficiary Age/Sex", `${record.benAge ? `${record.benAge} yrs` : "N/A"} / ${record.benSex || "N/A"}`],
           ["Diagnosis/Problem", record.diagnosis || "None"],
@@ -97,7 +105,7 @@ export default function ViewRecordModal({
           ["Remarks", record.remarks || "None"],
         ]} />
         {record.legacyApplication && (
-          <Details title="5. Imported MAIP Details" rows={[
+          <Details title="Imported MAIP details" rows={[
             ["Source", `${record.legacyApplication.sourceFile || "MAIP workbook"} · row ${record.legacyApplication.sourceRow || "—"}`],
             ["Source of Fund", record.legacyApplication.sourceOfFund || "Not recorded"],
             ["Purpose", record.legacyApplication.purpose || "Not recorded"],
@@ -109,23 +117,28 @@ export default function ViewRecordModal({
             ["ID Presented", record.legacyApplication.idPresented || "Not recorded"],
           ]} />
         )}
-        <h3 className="section-title">{record.legacyApplication ? "6" : "5"}. Attached ID Photos</h3>
-        {record.idImage || record.idImageBack ? (
-          <div className="id-image-grid">
-            {record.idImage && (
-              <figure>
-                <figcaption>ID Front</figcaption>
-                <Image unoptimized src={record.idImage} width={800} height={500} className="id-image-preview" alt="Front of attached ID" />
-              </figure>
-            )}
-            {record.idImageBack && (
-              <figure>
-                <figcaption>ID Back</figcaption>
-                <Image unoptimized src={record.idImageBack} width={800} height={500} className="id-image-preview" alt="Back of attached ID" />
-              </figure>
-            )}
+        <details className="record-detail-section">
+          <summary><span>Attached ID photos</span><small>{record.idImage || record.idImageBack ? `${Number(Boolean(record.idImage)) + Number(Boolean(record.idImageBack))} attached` : "None attached"}</small></summary>
+          <div className="record-detail-content">
+            {record.idImage || record.idImageBack ? (
+              <div className="id-image-grid">
+                {record.idImage && (
+                  <figure>
+                    <figcaption>ID Front</figcaption>
+                    <Image unoptimized src={record.idImage} width={800} height={500} className="id-image-preview" alt="Front of attached ID" />
+                  </figure>
+                )}
+                {record.idImageBack && (
+                  <figure>
+                    <figcaption>ID Back</figcaption>
+                    <Image unoptimized src={record.idImageBack} width={800} height={500} className="id-image-preview" alt="Back of attached ID" />
+                  </figure>
+                )}
+              </div>
+            ) : <p className="muted">No ID photos attached for this record.</p>}
           </div>
-        ) : <p className="muted">No ID photos attached for this record.</p>}
+        </details>
+        </div>
         <div className="modal-footer"><button className="btn secondary" onClick={onClose}>Close</button></div>
       </div>
     </div>
@@ -133,7 +146,7 @@ export default function ViewRecordModal({
 }
 
 function Details({ title, rows }: { title: string; rows: string[][] }) {
-  return <><h3 className="section-title">{title}</h3>{rows.map(([label, value]) => <div className="detail-row" key={label}><strong>{label}:</strong><span>{value}</span></div>)}</>;
+  return <details className="record-detail-section"><summary><span>{title}</span><small>{rows.length} fields</small></summary><div className="record-detail-content">{rows.map(([label, value]) => <div className="detail-row" key={label}><strong>{label}:</strong><span>{value}</span></div>)}</div></details>;
 }
 
 function formatTimestamp(value?: string, dateOnly = false) {

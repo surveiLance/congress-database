@@ -40,6 +40,7 @@ export default function HouseholdConnections({
   const [error, setError] = useState("");
   const [comparison, setComparison] = useState<HouseholdConnection | null>(null);
   const [relationship, setRelationship] = useState("");
+  const [householdDecision, setHouseholdDecision] = useState<"same-household" | "different-household">("same-household");
   const [manualSearch, setManualSearch] = useState("");
   const summary = householdSummaryForRecord(record, allRecords);
   const nameOnlyConnections = summary.nameOnlyConnections;
@@ -118,6 +119,7 @@ export default function HouseholdConnections({
       });
       setComparison(null);
       setRelationship("");
+      setHouseholdDecision("same-household");
     } catch (reason) {
       console.error(reason);
       setError("The relationship decision could not be saved. Please try again.");
@@ -129,6 +131,7 @@ export default function HouseholdConnections({
   const openComparison = (connection: HouseholdConnection) => {
     setComparison(connection);
     setRelationship(connection.declaredRelationship || "");
+    setHouseholdDecision(connection.status === "related" ? "different-household" : "same-household");
     setError("");
   };
 
@@ -147,7 +150,7 @@ export default function HouseholdConnections({
           </strong>
         </div>
         <div>
-          <span>Confirmed household assistance</span>
+          <span>Confirmed household total</span>
           <strong>{formatPeso(summary.confirmedAssistance)}</strong>
         </div>
         <small>{summary.connections.slice(0, 3).map((connection) => applicantName(connection.applicant)).join(" · ")}</small>
@@ -164,7 +167,7 @@ export default function HouseholdConnections({
           <p>Compare supporting details before deciding. Name patterns are clues only and never confirm a relationship automatically.</p>
         </div>
         <div className="household-total">
-          <span>Confirmed same-household assistance</span>
+          <span>Confirmed household total, including this applicant</span>
           <strong>{formatPeso(summary.confirmedAssistance)}</strong>
           <small>{summary.confirmedApplications} application{summary.confirmedApplications === 1 ? "" : "s"} · {summary.confirmedPeople} confirmed person{summary.confirmedPeople === 1 ? "" : "s"}</small>
         </div>
@@ -266,9 +269,11 @@ export default function HouseholdConnections({
           current={record}
           connection={comparison}
           relationship={relationship}
+          householdDecision={householdDecision}
           saving={savingKey === comparison.key}
           onRelationship={setRelationship}
-          onClose={() => { setComparison(null); setRelationship(""); setError(""); }}
+          onHouseholdDecision={setHouseholdDecision}
+          onClose={() => { setComparison(null); setRelationship(""); setHouseholdDecision("same-household"); setError(""); }}
           onDecision={(decision) => void updateConnection(comparison, decision)}
         />
       )}
@@ -315,8 +320,8 @@ function ConnectionCard({
         {connection.reasons.map((reason) => <span key={reason}>{reason}</span>)}
       </div>
       <div className="household-actions">
-        {onView && <button className="btn secondary small" type="button" onClick={() => onView(connection.applicant)}>View History</button>}
-        <button className="btn small" type="button" onClick={onCompare}>Compare Details</button>
+        {onView && <button className="btn tertiary small" type="button" onClick={() => onView(connection.applicant)}>Application history</button>}
+        <button className="btn small" type="button" onClick={onCompare}>Compare</button>
         {connection.status !== "possible" && canUpdate && (
           <button className="btn tertiary small" type="button" disabled={saving} onClick={onRemove}>
             {saving ? "Saving…" : "Remove Link"}
@@ -331,16 +336,20 @@ function ComparisonPanel({
   current,
   connection,
   relationship,
+  householdDecision,
   saving,
   onRelationship,
+  onHouseholdDecision,
   onClose,
   onDecision,
 }: {
   current: AssistanceRecord;
   connection: HouseholdConnection;
   relationship: string;
+  householdDecision: "same-household" | "different-household";
   saving: boolean;
   onRelationship: (value: string) => void;
+  onHouseholdDecision: (value: "same-household" | "different-household") => void;
   onClose: () => void;
   onDecision: (decision: "same-household" | "different-household" | "dismiss") => void;
 }) {
@@ -348,9 +357,7 @@ function ComparisonPanel({
   const rows = [
     ["Full name", applicantName(current), applicantName(candidate), false],
     ["Birthday", current.birthday || "Not recorded", candidate.birthday || "Not recorded", exact(current.birthday, candidate.birthday)],
-    ["Sex", current.sex || "Not recorded", candidate.sex || "Not recorded", exact(current.sex, candidate.sex)],
     ["Address", addressLabel(current), addressLabel(candidate), exact(current.address, candidate.address)],
-    ["Barangay", current.brgy || "Not recorded", candidate.brgy || "Not recorded", exact(current.brgy, candidate.brgy)],
     ["Contact", current.contact || "Not recorded", candidate.contact || "Not recorded", exactDigits(current.contact, candidate.contact)],
     ["National / ID no.", idLabel(current), idLabel(candidate), exact(current.idNumber, candidate.idNumber)],
     ["Beneficiary", beneficiaryLabel(current), beneficiaryLabel(candidate), exact(current.benName, candidate.benName)],
@@ -363,6 +370,10 @@ function ComparisonPanel({
           <button className="close" type="button" onClick={onClose} aria-label="Close comparison">&times;</button>
         </div>
         <p className="relative-compare-guidance">Matching cells are highlighted, but staff must verify the relationship. Different addresses can still belong to relatives living separately.</p>
+        <div className={`relative-evidence-summary ${connection.evidenceTier}`}>
+          <strong>{connection.evidenceTier === "strong" ? "Strong supporting evidence" : connection.evidenceTier === "possible" ? "Supporting clues found" : "Name pattern only"}</strong>
+          <span>{connection.reasons.join(" · ") || "Found through staff search"}</span>
+        </div>
         <div className="relative-compare-table">
           <div className="compare-header"><span>Detail</span><strong>Current applicant</strong><strong>Possible relative</strong></div>
           {rows.map(([label, currentValue, candidateValue, matches]) => (
@@ -383,16 +394,25 @@ function ComparisonPanel({
             {relationshipOptions.map((option) => <option key={option}>{option}</option>)}
           </select>
         </label>
-        <div className="relative-decision-help">
-          <span><strong>Same household</strong> counts the relative’s assistance in the household total.</span>
-          <span><strong>Different household</strong> records the family link without adding their assistance to this household total.</span>
+        <fieldset className="relative-household-choice">
+          <legend>Do they currently belong to the same household?</legend>
+          <label className={householdDecision === "same-household" ? "selected" : ""}>
+            <input type="radio" name="household-decision" checked={householdDecision === "same-household"} onChange={() => onHouseholdDecision("same-household")} />
+            <span><strong>Yes, same household</strong><small>Include this relative’s grants in the household total.</small></span>
+          </label>
+          <label className={householdDecision === "different-household" ? "selected" : ""}>
+            <input type="radio" name="household-decision" checked={householdDecision === "different-household"} onChange={() => onHouseholdDecision("different-household")} />
+            <span><strong>No, different household</strong><small>Save the family link without combining assistance totals.</small></span>
+          </label>
+        </fieldset>
+        <div className="relative-confirm-note">
+          {!relationship ? "Select the relationship before confirming." : `Ready to record as ${relationship.toLowerCase()} · ${householdDecision === "same-household" ? "same household" : "different household"}.`}
         </div>
         <div className="relative-compare-actions">
-          <button className="btn secondary" type="button" onClick={onClose}>Review Later</button>
-          <button className="btn tertiary danger-text" type="button" disabled={saving} onClick={() => onDecision("dismiss")}>Not Related</button>
-          <button className="btn secondary" type="button" disabled={saving || !relationship} onClick={() => onDecision("different-household")}>Related, Different Household</button>
-          <button className="btn" type="button" disabled={saving || !relationship} onClick={() => onDecision("same-household")}>
-            {saving ? "Saving…" : "Confirm Same Household"}
+          <button className="btn tertiary" type="button" onClick={onClose}>Review later</button>
+          <button className="btn secondary danger-text" type="button" disabled={saving} onClick={() => onDecision("dismiss")}>Not related</button>
+          <button className="btn" type="button" disabled={saving || !relationship} onClick={() => onDecision(householdDecision)}>
+            {saving ? "Saving…" : "Confirm relationship"}
           </button>
         </div>
       </div>

@@ -56,43 +56,37 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
       .sort((a, b) => a.localeCompare(b));
   const activeFilters = getActiveFilters(filters);
   const clearFilters = () => onChange({ ...defaultRecordFilters, status: filters.status });
+  const barangays = uniqueValues("brgy", canonicalBarangay);
+  const assistanceTypes = uniqueValues("assistanceType");
 
   return (
     <section className="filters-section" aria-labelledby="advanced-filters-title">
-      <div className={`application-date-filter${filters.createdFrom || filters.createdTo ? " has-active" : ""}`}>
-        <div>
-          <strong>Application date</strong>
-          <small>Show applications made within a date range</small>
-        </div>
-        <label>
-          <span>From</span>
-          <input type="date" value={filters.createdFrom} onChange={(event) => update("createdFrom", event.target.value)} />
-        </label>
-        <label>
-          <span>To</span>
-          <input type="date" value={filters.createdTo} onChange={(event) => update("createdTo", event.target.value)} />
-        </label>
-        {(filters.createdFrom || filters.createdTo) && (
-          <button className="date-filter-clear" type="button" onClick={() => onChange({ ...filters, createdFrom: "", createdTo: "" })}>
-            Clear dates
-          </button>
-        )}
-      </div>
-      <div className={`filter-access${activeFilters.length ? " has-active" : ""}`}>
-        <button
-          className="filter-toggle"
-          type="button"
-          aria-expanded={expanded}
-          aria-controls="advanced-filter-fields"
-          onClick={() => setExpanded((current) => !current)}
-        >
+      <div className={`quick-filter-bar${activeFilters.length ? " has-active" : ""}`}>
+        <div className="quick-filter-heading">
           <span className="filter-toggle-icon" aria-hidden="true">≡</span>
           <span>
-            <strong id="advanced-filters-title">Filters</strong>
-            <small>{activeFilters.length ? `${activeFilters.length} currently applied` : "Narrow the records list"}</small>
+            <strong id="advanced-filters-title">Quick filters</strong>
+            <small>Common checks stay within reach</small>
           </span>
-          {activeFilters.length > 0 && <span className="active-filter-count">{activeFilters.length}</span>}
-          <span className={`filter-toggle-chevron${expanded ? " open" : ""}`} aria-hidden="true">⌄</span>
+        </div>
+        <Filter label="District">
+          <select value={filters.district} onChange={(event) => update("district", event.target.value)}>
+            <option value="">All locations</option>
+            <option value="district-1">District 1</option>
+            <option value="outside-district-1">Outside District 1</option>
+            <option value="not-recorded">Not recorded</option>
+          </select>
+        </Filter>
+        <Filter label="Barangay"><Options value={filters.barangay} values={barangays} allLabel="All barangays" onChange={(value) => update("barangay", value)} /></Filter>
+        <Filter label="Assistance"><Options value={filters.assistanceType} values={assistanceTypes} allLabel="All types" onChange={(value) => update("assistanceType", value)} /></Filter>
+        <Filter label="Sort">
+          <select value={filters.sort} onChange={(event) => update("sort", event.target.value)}>
+            <option value="name">Name</option><option value="newest">Newest</option><option value="oldest">Oldest</option>
+            <option value="amount-high">Amount highest</option><option value="amount-low">Amount lowest</option>
+          </select>
+        </Filter>
+        <button className="more-filter-button" type="button" onClick={() => setExpanded(true)} aria-haspopup="dialog">
+          More filters{activeFilters.length ? <span>{activeFilters.length}</span> : null}
         </button>
         <span className="filter-summary-count">{matchingCount} matching</span>
       </div>
@@ -120,44 +114,44 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
       )}
 
       {expanded && (
-        <div className="advanced-filter-panel" id="advanced-filter-fields">
-          <div className="filter-grid">
-            <Filter label="Name"><input value={filters.name} onChange={(event) => update("name", event.target.value)} placeholder="Applicant name" /></Filter>
-            <Filter label="District coverage">
-              <select value={filters.district} onChange={(event) => update("district", event.target.value)}>
-                <option value="">All locations</option>
-                <option value="district-1">District 1 barangays</option>
-                <option value="outside-district-1">Outside District 1</option>
-                <option value="not-recorded">Barangay not recorded</option>
-              </select>
-            </Filter>
-            <Filter label="Barangay"><Options value={filters.barangay} values={uniqueValues("brgy", canonicalBarangay)} allLabel="All barangays" onChange={(value) => update("barangay", value)} /></Filter>
-            <Filter label="Sex"><Options value={filters.sex} values={uniqueValues("sex")} allLabel="All" onChange={(value) => update("sex", value)} /></Filter>
-            <Filter label="Minimum age"><input type="number" min="0" value={filters.minAge} onChange={(event) => update("minAge", event.target.value)} /></Filter>
-            <Filter label="Maximum age"><input type="number" min="0" value={filters.maxAge} onChange={(event) => update("maxAge", event.target.value)} /></Filter>
-            <Filter label="Category"><Options value={filters.category} values={uniqueValues("category", canonicalCategory)} allLabel="All categories" onChange={(value) => update("category", value)} /></Filter>
-            <Filter label="Assistance type"><Options value={filters.assistanceType} values={uniqueValues("assistanceType")} allLabel="All types" onChange={(value) => update("assistanceType", value)} /></Filter>
-            <Filter label="Diagnosis or condition"><input value={filters.diagnosis} onChange={(event) => update("diagnosis", event.target.value)} placeholder="Keyword" /></Filter>
-            <Filter label="Condition category"><Options value={filters.conditionCategory} values={[...conditionCategories]} allLabel="All condition categories" onChange={(value) => update("conditionCategory", value)} /></Filter>
-            <Filter label="Employment status"><Options value={filters.employmentStatus} values={uniqueValues("employedStatus")} allLabel="All statuses" onChange={(value) => update("employmentStatus", value)} /></Filter>
-            <Filter label="Minimum monthly income"><MoneyInput value={filters.minIncome} onChange={(value) => update("minIncome", value)} /></Filter>
-            <Filter label="Maximum monthly income"><MoneyInput value={filters.maxIncome} onChange={(value) => update("maxIncome", value)} /></Filter>
-            <Filter label="Minimum monthly expenses"><MoneyInput value={filters.minExpenses} onChange={(value) => update("minExpenses", value)} /></Filter>
-            <Filter label="Maximum monthly expenses"><MoneyInput value={filters.maxExpenses} onChange={(value) => update("maxExpenses", value)} /></Filter>
-            <Filter label="Minimum amount granted"><MoneyInput value={filters.minAmount} onChange={(value) => update("minAmount", value)} /></Filter>
-            <Filter label="Maximum amount granted"><MoneyInput value={filters.maxAmount} onChange={(value) => update("maxAmount", value)} /></Filter>
-            <Filter label="Sort by">
-              <select value={filters.sort} onChange={(event) => update("sort", event.target.value)}>
-                <option value="name">Name</option><option value="newest">Newest</option><option value="oldest">Oldest</option>
-                <option value="amount-high">Amount highest</option><option value="amount-low">Amount lowest</option>
-              </select>
-            </Filter>
-          </div>
-          <div className="filter-footer">
-            <span><strong>{matchingCount}</strong> matching record{matchingCount === 1 ? "" : "s"}</span>
-            <div className="filter-footer-actions">
-              {activeFilters.length > 0 && <button className="btn secondary" type="button" onClick={clearFilters}>Clear all</button>}
-              <button className="btn" type="button" onClick={() => setExpanded(false)}>Done</button>
+        <div className="filter-drawer-backdrop" role="dialog" aria-modal="true" aria-labelledby="more-filters-title">
+          <div className="advanced-filter-panel" id="advanced-filter-fields">
+            <div className="filter-panel-heading">
+              <div><span className="eyebrow">Records desk</span><h2 id="more-filters-title">More filters</h2><p>Use only the extra details needed for this search.</p></div>
+              <button className="close" type="button" onClick={() => setExpanded(false)} aria-label="Close filters">&times;</button>
+            </div>
+            <div className="filter-groups">
+              <FilterGroup title="Application">
+                <Filter label="Applicant name"><input value={filters.name} onChange={(event) => update("name", event.target.value)} placeholder="Name within current results" /></Filter>
+                <Filter label="Application date from"><input type="date" value={filters.createdFrom} onChange={(event) => update("createdFrom", event.target.value)} /></Filter>
+                <Filter label="Application date to"><input type="date" value={filters.createdTo} onChange={(event) => update("createdTo", event.target.value)} /></Filter>
+              </FilterGroup>
+              <FilterGroup title="Applicant">
+                <Filter label="Sex"><Options value={filters.sex} values={uniqueValues("sex")} allLabel="All" onChange={(value) => update("sex", value)} /></Filter>
+                <Filter label="Minimum age"><input type="number" min="0" value={filters.minAge} onChange={(event) => update("minAge", event.target.value)} /></Filter>
+                <Filter label="Maximum age"><input type="number" min="0" value={filters.maxAge} onChange={(event) => update("maxAge", event.target.value)} /></Filter>
+                <Filter label="Category"><Options value={filters.category} values={uniqueValues("category", canonicalCategory)} allLabel="All categories" onChange={(value) => update("category", value)} /></Filter>
+              </FilterGroup>
+              <FilterGroup title="Medical">
+                <Filter label="Diagnosis or condition"><input value={filters.diagnosis} onChange={(event) => update("diagnosis", event.target.value)} placeholder="Keyword" /></Filter>
+                <Filter label="Condition category"><Options value={filters.conditionCategory} values={[...conditionCategories]} allLabel="All condition categories" onChange={(value) => update("conditionCategory", value)} /></Filter>
+              </FilterGroup>
+              <FilterGroup title="Employment & financial">
+                <Filter label="Employment status"><Options value={filters.employmentStatus} values={uniqueValues("employedStatus")} allLabel="All statuses" onChange={(value) => update("employmentStatus", value)} /></Filter>
+                <Filter label="Minimum monthly income"><MoneyInput value={filters.minIncome} onChange={(value) => update("minIncome", value)} /></Filter>
+                <Filter label="Maximum monthly income"><MoneyInput value={filters.maxIncome} onChange={(value) => update("maxIncome", value)} /></Filter>
+                <Filter label="Minimum monthly expenses"><MoneyInput value={filters.minExpenses} onChange={(value) => update("minExpenses", value)} /></Filter>
+                <Filter label="Maximum monthly expenses"><MoneyInput value={filters.maxExpenses} onChange={(value) => update("maxExpenses", value)} /></Filter>
+                <Filter label="Minimum amount granted"><MoneyInput value={filters.minAmount} onChange={(value) => update("minAmount", value)} /></Filter>
+                <Filter label="Maximum amount granted"><MoneyInput value={filters.maxAmount} onChange={(value) => update("maxAmount", value)} /></Filter>
+              </FilterGroup>
+            </div>
+            <div className="filter-footer">
+              <span><strong>{matchingCount}</strong> matching record{matchingCount === 1 ? "" : "s"}</span>
+              <div className="filter-footer-actions">
+                {activeFilters.length > 0 && <button className="btn secondary" type="button" onClick={clearFilters}>Clear all</button>}
+                <button className="btn" type="button" onClick={() => setExpanded(false)}>Show results</button>
+              </div>
             </div>
           </div>
         </div>
@@ -220,6 +214,10 @@ function getActiveFilters(filters: RecordFilters): ActiveFilter[] {
 
 function Filter({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="filter-field"><span>{label}</span>{children}</label>;
+}
+
+function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return <fieldset className="filter-group"><legend>{title}</legend><div>{children}</div></fieldset>;
 }
 
 function Options({ value, values, allLabel, onChange }: { value: string; values: string[]; allLabel: string; onChange: (value: string) => void }) {
