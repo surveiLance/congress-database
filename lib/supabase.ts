@@ -5,7 +5,9 @@ const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabasePublishableKey);
 export const isSupabaseTestMode =
-  isSupabaseConfigured && process.env.NEXT_PUBLIC_SUPABASE_TEST_MODE === "true";
+  isSupabaseConfigured &&
+  process.env.NODE_ENV !== "production" &&
+  process.env.NEXT_PUBLIC_SUPABASE_TEST_MODE === "true";
 
 let browserClient: SupabaseClient | null = null;
 
