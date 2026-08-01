@@ -1,5 +1,6 @@
 import { readSheet } from "read-excel-file/browser";
 import { AssistanceRecord, LegacyApplicationData } from "./types";
+import { canonicalBarangay, canonicalCategory } from "./recordTaxonomy";
 
 type CellValue = string | number | boolean | Date | null | undefined;
 
@@ -114,7 +115,7 @@ function mapMaipRow(
     sex: choiceValue(source.get("SEX"), "Not recorded"),
     contact: contactValue(source.get("CONTACT NUMBER")) || "Not recorded",
     idNumber: "",
-    brgy: textValue(source.get("BARANGAY")) || "Not recorded",
+    brgy: canonicalBarangay(textValue(source.get("BARANGAY"))),
     address: textValue(source.get("ADDRESS")) || "Not recorded",
     work: textValue(source.get("OCCUPATION")),
     salary: numberValue(source.get("SALARY")),
@@ -210,11 +211,7 @@ function assistanceValue(value: CellValue): string {
 }
 
 function categoryValue(value: CellValue): string {
-  const text = textValue(value);
-  if (/FHONA|FAMILY HEADS/i.test(text)) return "FHONA";
-  if (/SENIOR/i.test(text)) return "Senior";
-  if (/PWD|DISAB/i.test(text)) return "PWD";
-  return choiceValue(text);
+  return canonicalCategory(textValue(value));
 }
 
 function relationshipValue(value: CellValue): string {

@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { ApplicantHistory, buildApplicantHistories } from "@/lib/applicantIdentity";
 import { AssistanceRecord } from "@/lib/types";
+import { canonicalBarangay, canonicalCategory } from "@/lib/recordTaxonomy";
 
 interface DashboardProps {
   records: AssistanceRecord[];
@@ -26,7 +27,7 @@ export default function Dashboard({ records, onView }: DashboardProps) {
     const total = records.reduce((sum, record) => sum + record.amount, 0);
     const histories = Array.from(buildApplicantHistories(records).values());
     const applicants = histories.map((history) => history.latestApplication);
-    const canonicalBarangay = (record: AssistanceRecord) => normalizeBarangay(record.brgy);
+    const recordBarangay = (record: AssistanceRecord) => canonicalBarangay(record.brgy);
     const canonicalAssistance = (record: AssistanceRecord) => normalizeLabel(record.assistanceType);
     return {
       histories,
@@ -36,18 +37,18 @@ export default function Dashboard({ records, onView }: DashboardProps) {
         ["Total Applications", records.length.toLocaleString()],
         ["Male Applicants", countValue(applicants, "sex", "male").toLocaleString()],
         ["Female Applicants", countValue(applicants, "sex", "female").toLocaleString()],
-        ["Senior Applicants", applicants.filter((record) => record.category.toLowerCase() === "senior" || Number(record.age) >= 60).length.toLocaleString()],
+        ["Senior Applicants", applicants.filter((record) => canonicalCategory(record.category) === "Senior" || Number(record.age) >= 60).length.toLocaleString()],
         ["Medical Assistance Cases", countValue(records, "assistanceType", "medical").toLocaleString()],
         ["Total Amount Granted", money(total)],
         ["Average Amount Granted", money(records.length ? total / records.length : 0)],
         ["Applicants with Diagnoses", histories.filter((history) => history.records.some((record) => record.diagnosis.trim())).length.toLocaleString()],
       ],
-      barangayCounts: groupCount(applicants, canonicalBarangay, "applicants"),
+      barangayCounts: groupCount(applicants, recordBarangay, "applicants"),
       assistanceCounts: groupCount(records, canonicalAssistance, "applications", true),
       monthlyCounts: groupByMonth(records),
       applicantFrequency: groupApplicantFrequency(histories),
       ageGroups: groupAgeRanges(applicants),
-      barangayAmounts: groupSum(records, canonicalBarangay, (record) => record.amount),
+      barangayAmounts: groupSum(records, recordBarangay, (record) => record.amount),
     };
   }, [records]);
   const { histories, cards, barangayCounts, assistanceCounts, monthlyCounts, applicantFrequency, ageGroups, barangayAmounts } = report;
@@ -389,23 +390,6 @@ function applicantAge(record: AssistanceRecord): number | null {
   return Number.isFinite(recordedAge) && recordedAge >= 0 && recordedAge <= 130 ? recordedAge : null;
 }
 
-function normalizeBarangay(value: string): string {
-  const normalized = normalizeSearchText(value);
-  if (!normalized) return "Unspecified";
-  const aliases: Record<string, string> = {
-    "bagong nayon": "Bagong Nayon",
-    "beverly hills": "Beverly Hills",
-    "de la paz": "Dela Paz",
-    "dela paz": "Dela Paz",
-    "munting dilaw": "Muntingdilaw",
-    muntingdilaw: "Muntingdilaw",
-    "san isidro": "San Isidro",
-    "sta cruz": "Sta. Cruz",
-    "santa cruz": "Sta. Cruz",
-  };
-  return aliases[normalized] || titleCase(normalized);
-}
-
 function normalizeLabel(value: string): string {
   const normalized = normalizeSearchText(value);
   return normalized ? titleCase(normalized) : "Unspecified";
@@ -487,7 +471,7 @@ function ChartApplicantModal({
     [group.records],
   );
   const barangayOptions = useMemo(
-    () => uniqueOptions(group.records.map((record) => record.brgy)),
+    () => uniqueOptions(group.records.map((record) => canonicalBarangay(record.brgy))),
     [group.records],
   );
   const filtered = useMemo(() => {
@@ -505,7 +489,7 @@ function ChartApplicantModal({
         ].join(" "));
         return (!normalizedQuery || searchable.includes(normalizedQuery)) &&
           (!assistanceType || record.assistanceType === assistanceType) &&
-          (!barangay || record.brgy === barangay) &&
+          (!barangay || canonicalBarangay(record.brgy) === barangay) &&
           (!dateFrom || applicationDate >= dateFrom) &&
           (!dateTo || applicationDate <= dateTo);
       })

@@ -15,6 +15,7 @@ import { addRecord, deleteRecord, getRecord, getRecords, subscribeToRecordChange
 import { applicantIdentityKey } from "@/lib/applicantIdentity";
 import { getSupabaseClient } from "@/lib/supabase";
 import { AssistanceRecord } from "@/lib/types";
+import { barangayDistrictGroup, canonicalBarangay, canonicalCategory } from "@/lib/recordTaxonomy";
 
 type Workspace = "records" | "matching" | "reports" | "utilities";
 
@@ -106,10 +107,11 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
 
       return tokensMatch(globalQuery, searchable) &&
         tokensMatch(nameQuery, fullName) &&
-        normalizedOptionMatches(filters.barangay, record.brgy) &&
+        (!filters.district || barangayDistrictGroup(record.brgy) === filters.district) &&
+        (!filters.barangay || canonicalBarangay(filters.barangay) === canonicalBarangay(record.brgy)) &&
         normalizedOptionMatches(filters.sex, record.sex) &&
         inNumberRange(Number(record.age), filters.minAge, filters.maxAge) &&
-        normalizedOptionMatches(filters.category, record.category) &&
+        (!filters.category || canonicalCategory(filters.category) === canonicalCategory(record.category)) &&
         normalizedOptionMatches(filters.assistanceType, record.assistanceType) &&
         tokensMatch(diagnosisQuery, diagnosis) &&
         (!filters.conditionCategory || record.conditionCategories.some((category) => normalizedOptionMatches(filters.conditionCategory, category))) &&

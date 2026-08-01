@@ -19,6 +19,7 @@ import {
 } from "@/lib/draftStore";
 import { householdSummaryForRecord } from "@/lib/householdMatching";
 import { AssistanceRecord, emptyRecord, FamilyMember } from "@/lib/types";
+import { antipoloBarangays } from "@/lib/recordTaxonomy";
 
 interface Props {
   open: boolean;
@@ -28,7 +29,7 @@ interface Props {
   onSave: (record: AssistanceRecord) => Promise<void>;
 }
 
-const barangays = ["Dela Paz", "San Isidro", "Sta.cruz", "Bagong Nayon", "Mambugan", "Mayamot", "Beverly Hills", "Muntindilaw"];
+const barangays = [...antipoloBarangays];
 const familyRelationships = [
   "Husband", "Wife", "Partner",
   "Son", "Daughter", "Stepson", "Stepdaughter",

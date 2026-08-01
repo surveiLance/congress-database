@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { AssistanceRecord } from "@/lib/types";
 import { conditionCategories } from "@/lib/conditionCategories";
+import { canonicalBarangay, canonicalCategory, canonicalLabel } from "@/lib/recordTaxonomy";
 
 export type RecordStatusFilter = "active" | "archived";
 export type RecordSort = "name" | "newest" | "oldest" | "amount-high" | "amount-low";
 
 export interface RecordFilters {
   name: string;
+  district: string;
   barangay: string;
   sex: string;
   minAge: string;
@@ -31,7 +33,7 @@ export interface RecordFilters {
 }
 
 export const defaultRecordFilters: RecordFilters = {
-  name: "", barangay: "", sex: "", minAge: "", maxAge: "", category: "",
+  name: "", district: "", barangay: "", sex: "", minAge: "", maxAge: "", category: "",
   assistanceType: "", diagnosis: "", conditionCategory: "", employmentStatus: "", minIncome: "",
   maxIncome: "", minExpenses: "", maxExpenses: "", minAmount: "", maxAmount: "",
   createdFrom: "", createdTo: "", status: "active", sort: "newest",
@@ -49,8 +51,9 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
   const update = (field: keyof RecordFilters, value: string) => {
     onChange({ ...filters, [field]: value });
   };
-  const uniqueValues = (field: keyof AssistanceRecord) =>
-    Array.from(new Set(records.map((record) => String(record[field] || "")).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  const uniqueValues = (field: keyof AssistanceRecord, canonicalize = canonicalLabel) =>
+    Array.from(new Set(records.map((record) => canonicalize(String(record[field] || ""))).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b));
   const activeFilters = getActiveFilters(filters);
   const clearFilters = () => onChange({ ...defaultRecordFilters, status: filters.status });
 
@@ -120,11 +123,19 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
         <div className="advanced-filter-panel" id="advanced-filter-fields">
           <div className="filter-grid">
             <Filter label="Name"><input value={filters.name} onChange={(event) => update("name", event.target.value)} placeholder="Applicant name" /></Filter>
-            <Filter label="Barangay"><Options value={filters.barangay} values={uniqueValues("brgy")} allLabel="All barangays" onChange={(value) => update("barangay", value)} /></Filter>
+            <Filter label="District coverage">
+              <select value={filters.district} onChange={(event) => update("district", event.target.value)}>
+                <option value="">All locations</option>
+                <option value="district-1">District 1 barangays</option>
+                <option value="outside-district-1">Outside District 1</option>
+                <option value="not-recorded">Barangay not recorded</option>
+              </select>
+            </Filter>
+            <Filter label="Barangay"><Options value={filters.barangay} values={uniqueValues("brgy", canonicalBarangay)} allLabel="All barangays" onChange={(value) => update("barangay", value)} /></Filter>
             <Filter label="Sex"><Options value={filters.sex} values={uniqueValues("sex")} allLabel="All" onChange={(value) => update("sex", value)} /></Filter>
             <Filter label="Minimum age"><input type="number" min="0" value={filters.minAge} onChange={(event) => update("minAge", event.target.value)} /></Filter>
             <Filter label="Maximum age"><input type="number" min="0" value={filters.maxAge} onChange={(event) => update("maxAge", event.target.value)} /></Filter>
-            <Filter label="Category"><Options value={filters.category} values={uniqueValues("category")} allLabel="All categories" onChange={(value) => update("category", value)} /></Filter>
+            <Filter label="Category"><Options value={filters.category} values={uniqueValues("category", canonicalCategory)} allLabel="All categories" onChange={(value) => update("category", value)} /></Filter>
             <Filter label="Assistance type"><Options value={filters.assistanceType} values={uniqueValues("assistanceType")} allLabel="All types" onChange={(value) => update("assistanceType", value)} /></Filter>
             <Filter label="Diagnosis or condition"><input value={filters.diagnosis} onChange={(event) => update("diagnosis", event.target.value)} placeholder="Keyword" /></Filter>
             <Filter label="Condition category"><Options value={filters.conditionCategory} values={[...conditionCategories]} allLabel="All condition categories" onChange={(value) => update("conditionCategory", value)} /></Filter>
@@ -169,6 +180,14 @@ function getActiveFilters(filters: RecordFilters): ActiveFilter[] {
   };
 
   add("name", `Name: ${filters.name}`);
+  if (filters.district) {
+    const districtLabels: Record<string, string> = {
+      "district-1": "District: District 1",
+      "outside-district-1": "District: Outside District 1",
+      "not-recorded": "District: Barangay not recorded",
+    };
+    active.push({ field: "district", label: districtLabels[filters.district] || filters.district });
+  }
   add("barangay", `Barangay: ${filters.barangay}`);
   add("sex", `Sex: ${filters.sex}`);
   add("minAge", `Age: ${filters.minAge}+`);
