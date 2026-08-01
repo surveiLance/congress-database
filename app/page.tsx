@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdvancedFilters, { defaultRecordFilters, RecordFilters } from "@/components/AdvancedFilters";
-import ConditionMigration from "@/components/ConditionMigration";
 import Dashboard from "@/components/Dashboard";
 import DataTransfer from "@/components/DataTransfer";
 import DistrictLogo from "@/components/DistrictLogo";
@@ -501,7 +500,6 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
             <div className="utility-stack">
               {sharedDatabase && <LocalRecordsMigration sharedRecords={records} onChanged={refresh} />}
               <DataTransfer records={records} onChanged={refresh} />
-              <ConditionMigration records={records} onChanged={refresh} />
             </div>
         </div>
       </div>
