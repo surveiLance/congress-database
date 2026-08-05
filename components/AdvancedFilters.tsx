@@ -47,6 +47,11 @@ export interface RecordFilters {
   payoutTo: string;
   status: RecordStatusFilter;
   sort: RecordSort;
+  /** Internal report drilldown filter; not shown in the records filter UI. */
+  reportFrequency?: "" | "first-time" | "returning";
+  /** Internal chart drilldown selector; not shown in the records filter UI. */
+  reportDimension?: "" | "applicant-barangay" | "grant-barangay" | "assistance" | "month" | "frequency" | "age-group";
+  reportValue?: string;
 }
 
 export const defaultRecordFilters: RecordFilters = {
@@ -54,6 +59,8 @@ export const defaultRecordFilters: RecordFilters = {
   assistanceType: "", agencies: [], agencyMatch: "includes", diagnosis: "", conditionCategory: "", employmentStatus: "", minIncome: "",
   maxIncome: "", minExpenses: "", maxExpenses: "", minAmount: "", maxAmount: "",
   createdFrom: "", createdTo: "", payoutFrom: "", payoutTo: "", status: "active", sort: "newest",
+  reportFrequency: "",
+  reportDimension: "", reportValue: "",
 };
 
 interface Props {

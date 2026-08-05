@@ -10,7 +10,6 @@ import { addRecord, deleteRecord, getRecord, getRecordPage, getRecords, RecordFi
 import { applicantIdentityKey } from "@/lib/applicantIdentity";
 import { getSupabaseClient } from "@/lib/supabase";
 import { AssistanceRecord } from "@/lib/types";
-import { filterAndSortRecords } from "@/lib/recordQuery";
 
 const Dashboard = dynamic(() => import("@/components/Dashboard"), {
   loading: () => <WorkspaceLoading label="Opening district reports…" />,
@@ -58,6 +57,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   const [filterOptions, setFilterOptions] = useState<RecordFilterOptions>({ barangays: [], assistanceTypes: [], sexes: [], categories: [], employmentStatuses: [] });
   const [recordsLoading, setRecordsLoading] = useState(true);
   const [fastRecordPaging, setFastRecordPaging] = useState(true);
+  const [reportRefreshKey, setReportRefreshKey] = useState(0);
   const [workspace, setWorkspace] = useState<Workspace>("records");
   const [query, setQuery] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -100,15 +100,12 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     return subscribeToRecordChanges(() => {
       setSupportRecords(null);
       supportLoadPromise.current = null;
+      setReportRefreshKey((value) => value + 1);
       void refresh();
     });
   }, [refresh, sharedDatabase]);
 
   const showArchived = filters.status === "archived";
-  const filteredSupportRecords = useMemo(
-    () => supportRecords ? filterAndSortRecords(supportRecords, query, filters) : [],
-    [filters, query, supportRecords],
-  );
   const pageCount = Math.max(1, Math.ceil(recordTotal / pageSize));
   const firstVisibleRecord = recordTotal ? (recordPage - 1) * pageSize + 1 : 0;
   const lastVisibleRecord = Math.min(recordPage * pageSize, recordTotal);
@@ -159,6 +156,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   const refreshAfterChange = useCallback(async () => {
     setSupportRecords(null);
     supportLoadPromise.current = null;
+    setReportRefreshKey((value) => value + 1);
     await refresh();
   }, [refresh]);
 
@@ -351,7 +349,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
 
   const changeWorkspace = (nextWorkspace: Workspace) => {
     setWorkspace(nextWorkspace);
-    if (nextWorkspace !== "records") {
+    if (nextWorkspace === "matching" || nextWorkspace === "utilities") {
       void ensureSupportRecords().catch((reason) => {
         console.error(reason);
         setError("The complete application set could not be loaded for this tool.");
@@ -529,9 +527,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
                 <p>Figures use the current record filters and contain no personally identifiable information.</p>
               </div>
             </section>
-            {supportRecords
-              ? <Dashboard records={filteredSupportRecords} onView={openViewRecord} />
-              : <WorkspaceLoading label="Preparing complete district reports…" />}
+            <Dashboard query={query} filters={filters} refreshKey={reportRefreshKey} onView={openViewRecord} />
         </div>}
 
         <div className="workspace-view" hidden={workspace !== "utilities"}>

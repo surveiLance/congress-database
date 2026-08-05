@@ -7,7 +7,7 @@ The application supports a shared Supabase database for authenticated staff. Unt
 ## Shared Supabase database
 
 1. Create a Supabase project.
-2. Open **SQL Editor** and run [`supabase/schema.sql`](supabase/schema.sql), then run [`supabase/performance.sql`](supabase/performance.sql).
+2. Open **SQL Editor** and run [`supabase/schema.sql`](supabase/schema.sql), then [`supabase/performance.sql`](supabase/performance.sql), then [`supabase/reporting.sql`](supabase/reporting.sql).
 3. In **Authentication → Sign In / Providers**, turn off **Allow new users to sign up** and keep anonymous sign-ins disabled.
 4. In **Authentication → Users**, use **Add user** to create or invite approved staff accounts.
 5. Copy `.env.example` to `.env.local`.
@@ -53,11 +53,13 @@ default. Search, filters, counts, sorting, and pagination run inside Supabase,
 so the first screen downloads only the current page rather than every
 application. Applicant-history totals are returned with those rows. The
 performance migration maintains a compact, photo-free search index beside the
-source table, so routine searches and reports do not repeatedly inspect large
+source table, so routine searches do not repeatedly inspect large
 ID images. Inserts, edits, archives, restores, and deletes synchronize this
 index automatically; the original application JSON remains authoritative. The
-complete lightweight application set is loaded only when staff opens reports,
-document matching, backup/import tools, a new application, or full applicant
+Reports are calculated inside Supabase and return only aggregate cards and
+chart points; opening a chart requests one 20-row application page. The
+complete lightweight application set is loaded only when staff opens document
+matching, backup/import tools, a new application, or full applicant
 history. A full record and its attached images are loaded only when staff opens
 or edits that application.
 
@@ -67,6 +69,12 @@ Editor. Until that function is installed, the application automatically falls
 back to the older compatible browser-side query and displays a compatibility
 notice. No existing application is changed by the performance migration; it
 only creates and backfills the synchronized lookup table.
+
+For server-generated dashboards, run
+[`supabase/reporting.sql`](supabase/reporting.sql) after the performance SQL.
+It does not change application rows. It adds database functions that calculate
+complete filtered reports and return paginated chart drilldowns without sending
+the entire application set to the browser.
 
 ## Record management
 
@@ -94,7 +102,12 @@ name relationship or an explicitly listed family member.
 
 ## Dashboard reports
 
-Summary cards and aggregate charts update from the same searched and filtered IndexedDB records shown in the table. Charts use broad categories without applicant names or contact information. Use **Print Report** to print or save the dashboard as a PDF through the browser.
+With Supabase configured, summary cards and charts are calculated across the
+complete searched and filtered database on the server. Only aggregate values
+are sent for chart display, while clicked chart categories request application
+rows in pages of 20. Local IndexedDB mode keeps the compatible browser-side
+calculation. Charts use broad categories without applicant names or contact
+information. Use **Print Report** to print or save the dashboard as a PDF.
 
 ## Condition categories
 

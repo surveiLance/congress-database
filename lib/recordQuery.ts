@@ -14,9 +14,37 @@ export function filterAndSortRecords(
   const globalQuery = searchTokens(query);
   const nameQuery = searchTokens(filters.name);
   const diagnosisQuery = searchTokens(filters.diagnosis);
-  return visible
-    .filter((record) => recordMatches(record, globalQuery, nameQuery, diagnosisQuery, filters))
+  const matching = visible.filter((record) => recordMatches(record, globalQuery, nameQuery, diagnosisQuery, filters));
+  return reportSegmentRecords(matching, filters)
     .sort((first, second) => compareRecords(first, second, filters.sort, histories));
+}
+
+function reportSegmentRecords(records: AssistanceRecord[], filters: RecordFilters) {
+  if (!filters.reportDimension || !filters.reportValue) return records;
+  const histories = buildApplicantHistories(records);
+  const latestIds = new Set(Array.from(histories.values()).flatMap((history) => history.latestApplication.id === undefined ? [] : [history.latestApplication.id]));
+  const latestRecords = records.filter((record) => record.id === undefined
+    ? histories.get(applicantIdentityKey(record))?.latestApplication === record
+    : latestIds.has(record.id));
+  if (filters.reportDimension === "applicant-barangay") return latestRecords.filter((record) => canonicalBarangay(record.brgy) === canonicalBarangay(filters.reportValue || ""));
+  if (filters.reportDimension === "grant-barangay") return records.filter((record) => canonicalBarangay(record.brgy) === canonicalBarangay(filters.reportValue || ""));
+  if (filters.reportDimension === "assistance") return records.filter((record) => normalizedOptionMatches(filters.reportValue || "", record.assistanceType));
+  if (filters.reportDimension === "month") return records.filter((record) => (record.applicationDate || record.createdAt).slice(0, 7) === filters.reportValue);
+  if (filters.reportDimension === "frequency") return records.filter((record) => {
+    const count = histories.get(applicantIdentityKey(record))?.applicationCount || 1;
+    return filters.reportValue === "Returning" ? count > 1 : count === 1;
+  });
+  if (filters.reportDimension === "age-group") return latestRecords.filter((record) => ageGroup(Number(record.age)) === filters.reportValue);
+  return records;
+}
+
+function ageGroup(age: number) {
+  if (!Number.isFinite(age) || age <= 0) return "Not recorded";
+  if (age < 18) return "Under 18";
+  if (age < 30) return "18–29";
+  if (age < 45) return "30–44";
+  if (age < 60) return "45–59";
+  return "60+";
 }
 
 function recordMatches(

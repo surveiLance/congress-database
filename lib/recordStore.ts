@@ -10,6 +10,7 @@ import {
 import { getSupabaseClient, isSupabaseConfigured } from "./supabase";
 import type { RecordFilters } from "@/components/AdvancedFilters";
 import { filterAndSortRecords } from "./recordQuery";
+import { buildDashboardReport, DashboardReportData } from "./reportData";
 
 interface SharedRecordRow {
   id: number | string;
@@ -31,6 +32,12 @@ export interface RecordPageResult {
   archivedCount: number;
   filterOptions: RecordFilterOptions;
   fastPath: boolean;
+}
+
+export interface ReportRecordPageResult {
+  records: AssistanceRecord[];
+  total: number;
+  totalGranted: number;
 }
 
 interface RecordPageRequest {
@@ -100,6 +107,53 @@ export async function getRecordPage({ query, filters, page, pageSize }: RecordPa
     archivedCount: allRecords.filter((record) => Boolean(record.archivedAt)).length,
     filterOptions: filterOptionsFromRecords(allRecords),
     fastPath: false,
+  };
+}
+
+export async function getDashboardReport(query: string, filters: RecordFilters): Promise<DashboardReportData> {
+  if (isSupabaseConfigured) {
+    const { data, error } = await getSupabaseClient().rpc("get_assistance_dashboard", {
+      p_query: query,
+      p_filters: filters,
+    });
+    if (error) throw new Error(databaseMessage(error.message));
+    return data as DashboardReportData;
+  }
+
+  return buildDashboardReport(filterAndSortRecords(await getRecords(), query, filters));
+}
+
+export async function getReportRecordPage({ query, filters, page, pageSize }: RecordPageRequest): Promise<ReportRecordPageResult> {
+  if (isSupabaseConfigured) {
+    const { data, error } = await getSupabaseClient().rpc("search_assistance_report_records", {
+      p_query: query,
+      p_filters: filters,
+      p_page: page,
+      p_page_size: pageSize,
+    });
+    if (error) throw new Error(databaseMessage(error.message));
+    const result = (data || {}) as {
+      records?: SharedRecordRow[];
+      total?: number;
+      total_granted?: number;
+    };
+    return {
+      records: (result.records || []).map((row) => normalizeRecord({
+        ...row.record,
+        id: Number(row.id),
+        recordLoadState: "summary",
+      })),
+      total: Number(result.total) || 0,
+      totalGranted: Number(result.total_granted) || 0,
+    };
+  }
+
+  const matching = filterAndSortRecords(await getRecords(), query, filters);
+  const start = (Math.max(1, page) - 1) * pageSize;
+  return {
+    records: matching.slice(start, start + pageSize),
+    total: matching.length,
+    totalGranted: matching.reduce((sum, record) => sum + record.amount, 0),
   };
 }
 
