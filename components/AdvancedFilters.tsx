@@ -15,6 +15,8 @@ export interface RecordFilters {
   sex: string;
   minAge: string;
   maxAge: string;
+  minHousehold: string;
+  maxHousehold: string;
   category: string;
   assistanceType: string;
   diagnosis: string;
@@ -33,7 +35,7 @@ export interface RecordFilters {
 }
 
 export const defaultRecordFilters: RecordFilters = {
-  name: "", district: "", barangay: "", sex: "", minAge: "", maxAge: "", category: "",
+  name: "", district: "", barangay: "", sex: "", minAge: "", maxAge: "", minHousehold: "", maxHousehold: "", category: "",
   assistanceType: "", diagnosis: "", conditionCategory: "", employmentStatus: "", minIncome: "",
   maxIncome: "", minExpenses: "", maxExpenses: "", minAmount: "", maxAmount: "",
   createdFrom: "", createdTo: "", status: "active", sort: "newest",
@@ -58,6 +60,19 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
   const clearFilters = () => onChange({ ...defaultRecordFilters, status: filters.status });
   const barangays = uniqueValues("brgy", canonicalBarangay);
   const assistanceTypes = uniqueValues("assistanceType");
+  const householdPreset = filters.minHousehold === "5" && !filters.maxHousehold
+    ? "5-plus"
+    : filters.minHousehold || filters.maxHousehold
+      ? "custom"
+      : "";
+
+  const updateHouseholdPreset = (value: string) => {
+    onChange({
+      ...filters,
+      minHousehold: value === "5-plus" ? "5" : "",
+      maxHousehold: "",
+    });
+  };
 
   return (
     <section className="filters-section" aria-labelledby="advanced-filters-title">
@@ -79,6 +94,13 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
         </Filter>
         <Filter label="Barangay"><Options value={filters.barangay} values={barangays} allLabel="All barangays" onChange={(value) => update("barangay", value)} /></Filter>
         <Filter label="Assistance"><Options value={filters.assistanceType} values={assistanceTypes} allLabel="All types" onChange={(value) => update("assistanceType", value)} /></Filter>
+        <Filter label="Household size">
+          <select value={householdPreset} onChange={(event) => updateHouseholdPreset(event.target.value)}>
+            <option value="">All household sizes</option>
+            <option value="5-plus">5 or more members</option>
+            {householdPreset === "custom" && <option value="custom" disabled>Custom range</option>}
+          </select>
+        </Filter>
         <Filter label="Sort">
           <select value={filters.sort} onChange={(event) => update("sort", event.target.value)}>
             <option value="name">Name</option><option value="newest">Newest</option><option value="oldest">Oldest</option>
@@ -136,6 +158,10 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
                 <Filter label="Diagnosis or condition"><input value={filters.diagnosis} onChange={(event) => update("diagnosis", event.target.value)} placeholder="Keyword" /></Filter>
                 <Filter label="Condition category"><Options value={filters.conditionCategory} values={[...conditionCategories]} allLabel="All condition categories" onChange={(value) => update("conditionCategory", value)} /></Filter>
               </FilterGroup>
+              <FilterGroup title="Household">
+                <Filter label="Minimum family members"><input type="number" min="0" step="1" value={filters.minHousehold} onChange={(event) => update("minHousehold", event.target.value)} placeholder="e.g. 5" /></Filter>
+                <Filter label="Maximum family members"><input type="number" min="0" step="1" value={filters.maxHousehold} onChange={(event) => update("maxHousehold", event.target.value)} /></Filter>
+              </FilterGroup>
               <FilterGroup title="Employment & financial">
                 <Filter label="Employment status"><Options value={filters.employmentStatus} values={uniqueValues("employedStatus")} allLabel="All statuses" onChange={(value) => update("employmentStatus", value)} /></Filter>
                 <Filter label="Minimum monthly income"><MoneyInput value={filters.minIncome} onChange={(value) => update("minIncome", value)} /></Filter>
@@ -186,6 +212,8 @@ function getActiveFilters(filters: RecordFilters): ActiveFilter[] {
   add("sex", `Sex: ${filters.sex}`);
   add("minAge", `Age: ${filters.minAge}+`);
   add("maxAge", `Age: up to ${filters.maxAge}`);
+  add("minHousehold", `Household: ${filters.minHousehold}+ members`);
+  add("maxHousehold", `Household: up to ${filters.maxHousehold} members`);
   add("category", `Category: ${filters.category}`);
   add("assistanceType", `Assistance: ${filters.assistanceType}`);
   add("diagnosis", `Diagnosis: ${filters.diagnosis}`);

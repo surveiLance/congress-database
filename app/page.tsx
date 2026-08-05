@@ -111,6 +111,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
         (!filters.barangay || canonicalBarangay(filters.barangay) === canonicalBarangay(record.brgy)) &&
         normalizedOptionMatches(filters.sex, record.sex) &&
         inNumberRange(Number(record.age), filters.minAge, filters.maxAge) &&
+        inNumberRange(record.householdMembers, filters.minHousehold, filters.maxHousehold) &&
         (!filters.category || canonicalCategory(filters.category) === canonicalCategory(record.category)) &&
         normalizedOptionMatches(filters.assistanceType, record.assistanceType) &&
         tokensMatch(diagnosisQuery, diagnosis) &&
