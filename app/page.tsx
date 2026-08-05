@@ -118,7 +118,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
         processingStageMatches(record, filters.processingStage) &&
         (!filters.category || canonicalCategory(filters.category) === canonicalCategory(record.category)) &&
         normalizedOptionMatches(filters.assistanceType, record.assistanceType) &&
-        agencyFilterMatches(record.assistanceAgencies, filters.agencyFilter) &&
+        agencyFilterMatches(record.assistanceAgencies, filters.agencies, filters.agencyMatch) &&
         tokensMatch(diagnosisQuery, diagnosis) &&
         (!filters.conditionCategory || record.conditionCategories.some((category) => normalizedOptionMatches(filters.conditionCategory, category))) &&
         normalizedOptionMatches(filters.employmentStatus, record.employedStatus) &&

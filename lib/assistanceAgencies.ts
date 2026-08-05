@@ -16,26 +16,16 @@ export function agencyCombinationKey(value: string[]): string {
   return normalizeAssistanceAgencies(value).map((agency) => agency.toLowerCase()).join("|");
 }
 
-export function agencyFilterMatches(agencies: string[], filterValue: string): boolean {
-  if (!filterValue) return true;
+export function agencyFilterMatches(
+  agencies: string[],
+  selectedAgencies: string[],
+  matchMode: "includes" | "exact",
+): boolean {
+  if (!selectedAgencies.length) return true;
   const normalized = normalizeAssistanceAgencies(agencies);
-  if (filterValue.startsWith("contains:")) {
-    const requested = canonicalAgency(filterValue.slice("contains:".length));
-    return normalized.includes(requested);
-  }
-  if (filterValue.startsWith("exact:")) {
-    return agencyCombinationKey(normalized) === filterValue.slice("exact:".length);
-  }
-  return true;
-}
-
-export function agencyFilterLabel(filterValue: string): string {
-  if (filterValue.startsWith("contains:")) return `Includes ${canonicalAgency(filterValue.slice("contains:".length))}`;
-  if (filterValue.startsWith("exact:")) {
-    const agencies = filterValue.slice("exact:".length).split("|").filter(Boolean).map(canonicalAgency);
-    return `${agencies.join(" + ")} only`;
-  }
-  return "All agency combinations";
+  const selected = normalizeAssistanceAgencies(selectedAgencies);
+  if (matchMode === "exact") return agencyCombinationKey(normalized) === agencyCombinationKey(selected);
+  return selected.every((agency) => normalized.includes(agency));
 }
 
 function canonicalAgency(value: string): string {

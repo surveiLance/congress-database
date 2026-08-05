@@ -4,12 +4,7 @@ import { useState } from "react";
 import { AssistanceRecord } from "@/lib/types";
 import { conditionCategories } from "@/lib/conditionCategories";
 import { canonicalBarangay, canonicalCategory, canonicalLabel } from "@/lib/recordTaxonomy";
-import {
-  agencyCombinationKey,
-  agencyFilterLabel,
-  assistanceAgencies,
-  formatAgencyCombination,
-} from "@/lib/assistanceAgencies";
+import { assistanceAgencies } from "@/lib/assistanceAgencies";
 
 export type RecordStatusFilter = "active" | "archived";
 export type RecordSort =
@@ -34,7 +29,8 @@ export interface RecordFilters {
   processingStage: string;
   category: string;
   assistanceType: string;
-  agencyFilter: string;
+  agencies: string[];
+  agencyMatch: "includes" | "exact";
   diagnosis: string;
   conditionCategory: string;
   employmentStatus: string;
@@ -54,7 +50,7 @@ export interface RecordFilters {
 
 export const defaultRecordFilters: RecordFilters = {
   name: "", district: "", barangay: "", sex: "", minAge: "", maxAge: "", minHousehold: "", maxHousehold: "", processingStage: "", category: "",
-  assistanceType: "", agencyFilter: "", diagnosis: "", conditionCategory: "", employmentStatus: "", minIncome: "",
+  assistanceType: "", agencies: [], agencyMatch: "includes", diagnosis: "", conditionCategory: "", employmentStatus: "", minIncome: "",
   maxIncome: "", minExpenses: "", maxExpenses: "", minAmount: "", maxAmount: "",
   createdFrom: "", createdTo: "", payoutFrom: "", payoutTo: "", status: "active", sort: "newest",
 };
@@ -76,22 +72,21 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
       .sort((a, b) => a.localeCompare(b));
   const activeFilters = getActiveFilters(filters);
   const clearFilters = () => onChange({ ...defaultRecordFilters, status: filters.status });
+  const removeFilter = (filter: ActiveFilter) => {
+    if (filter.field === "agencies") {
+      onChange({ ...filters, agencies: [], agencyMatch: "includes" });
+      return;
+    }
+    update(filter.field, filter.clearValue ?? "");
+  };
+  const toggleAgency = (agency: string) => {
+    const agencies = filters.agencies.includes(agency)
+      ? filters.agencies.filter((selected) => selected !== agency)
+      : [...filters.agencies, agency];
+    onChange({ ...filters, agencies });
+  };
   const barangays = uniqueValues("brgy", canonicalBarangay);
   const assistanceTypes = uniqueValues("assistanceType");
-  const exactAgencyCombinations = buildAgencyCombinations(records);
-  const householdPreset = filters.minHousehold === "5" && !filters.maxHousehold
-    ? "5-plus"
-    : filters.minHousehold || filters.maxHousehold
-      ? "custom"
-      : "";
-
-  const updateHouseholdPreset = (value: string) => {
-    onChange({
-      ...filters,
-      minHousehold: value === "5-plus" ? "5" : "",
-      maxHousehold: "",
-    });
-  };
 
   return (
     <section className="filters-section" aria-labelledby="advanced-filters-title">
@@ -113,23 +108,12 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
         </Filter>
         <Filter label="Barangay"><Options value={filters.barangay} values={barangays} allLabel="All barangays" onChange={(value) => update("barangay", value)} /></Filter>
         <Filter label="Assistance"><Options value={filters.assistanceType} values={assistanceTypes} allLabel="All types" onChange={(value) => update("assistanceType", value)} /></Filter>
-        <Filter label="Agency combination">
-          <select value={filters.agencyFilter} onChange={(event) => update("agencyFilter", event.target.value)}>
-            <option value="">All agency combinations</option>
-            <optgroup label="Contains agency">
-              {assistanceAgencies.map((agency) => <option value={`contains:${agency}`} key={`contains-${agency}`}>Includes {agency}</option>)}
-            </optgroup>
-            <optgroup label="Exact combination">
-              {exactAgencyCombinations.map(({ key, label }) => <option value={`exact:${key}`} key={key}>{label} only</option>)}
-            </optgroup>
-          </select>
-        </Filter>
-        <Filter label="Household size">
-          <select value={householdPreset} onChange={(event) => updateHouseholdPreset(event.target.value)}>
-            <option value="">All household sizes</option>
-            <option value="5-plus">5 or more members</option>
-            {householdPreset === "custom" && <option value="custom" disabled>Custom range</option>}
-          </select>
+        <Filter label="Family count">
+          <span className="family-count-range">
+            <input aria-label="Minimum family count" type="number" min="0" step="1" value={filters.minHousehold} onChange={(event) => update("minHousehold", event.target.value)} placeholder="Min" />
+            <span aria-hidden="true">to</span>
+            <input aria-label="Maximum family count" type="number" min="0" step="1" value={filters.maxHousehold} onChange={(event) => update("maxHousehold", event.target.value)} placeholder="Max" />
+          </span>
         </Filter>
         <Filter label="Processing stage">
           <select value={filters.processingStage} onChange={(event) => update("processingStage", event.target.value)}>
@@ -158,6 +142,32 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
         <span className="filter-summary-count">{matchingCount} matching</span>
       </div>
 
+      <div className={`agency-filter-strip${filters.agencies.length ? " has-active" : ""}`}>
+        <div className="agency-filter-heading">
+          <strong>Agency filter</strong>
+          <small>Check one or more agencies</small>
+        </div>
+        <div className="agency-filter-options" role="group" aria-label="Agencies">
+          {assistanceAgencies.map((agency) => (
+            <label className={filters.agencies.includes(agency) ? "selected" : ""} key={agency}>
+              <input type="checkbox" checked={filters.agencies.includes(agency)} onChange={() => toggleAgency(agency)} />
+              <span>{agency}</span>
+            </label>
+          ))}
+        </div>
+        <label className="agency-match-mode">
+          <span>Match</span>
+          <select
+            value={filters.agencyMatch}
+            disabled={!filters.agencies.length}
+            onChange={(event) => onChange({ ...filters, agencyMatch: event.target.value === "exact" ? "exact" : "includes" })}
+          >
+            <option value="includes">Includes selected</option>
+            <option value="exact">Exact combination only</option>
+          </select>
+        </label>
+      </div>
+
       {activeFilters.length > 0 && (
         <div className="active-filter-bar" aria-label="Applied filters">
           <span className="active-filter-label">Applied:</span>
@@ -167,7 +177,7 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
                 className="active-filter-chip"
                 type="button"
                 key={filter.field}
-                onClick={() => update(filter.field, filter.clearValue ?? "")}
+                onClick={() => removeFilter(filter)}
                 aria-label={`Remove ${filter.label} filter`}
                 title={`Remove ${filter.label} filter`}
               >
@@ -272,7 +282,13 @@ function getActiveFilters(filters: RecordFilters): ActiveFilter[] {
   }
   add("category", `Category: ${filters.category}`);
   add("assistanceType", `Assistance: ${filters.assistanceType}`);
-  if (filters.agencyFilter) active.push({ field: "agencyFilter", label: `Agencies: ${agencyFilterLabel(filters.agencyFilter)}` });
+  if (filters.agencies.length) {
+    const selected = assistanceAgencies.filter((agency) => filters.agencies.includes(agency));
+    active.push({
+      field: "agencies",
+      label: `Agencies: ${filters.agencyMatch === "exact" ? "exactly " : "includes "}${selected.join(" + ")}`,
+    });
+  }
   add("diagnosis", `Diagnosis: ${filters.diagnosis}`);
   add("conditionCategory", `Condition: ${filters.conditionCategory}`);
   add("employmentStatus", `Employment: ${filters.employmentStatus}`);
@@ -324,19 +340,4 @@ function Options({ value, values, allLabel, onChange }: { value: string; values:
 
 function MoneyInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return <input type="number" min="0" step=".01" value={value} onChange={(event) => onChange(event.target.value)} placeholder="₱0.00" />;
-}
-
-function buildAgencyCombinations(records: AssistanceRecord[]) {
-  const combinations = [
-    ...assistanceAgencies.map((agency) => [agency]),
-    ...assistanceAgencies.filter((agency) => agency !== "DSWD").map((agency) => ["DSWD", agency]),
-    ...records.map((record) => record.assistanceAgencies),
-  ];
-  const unique = new Map<string, string>();
-  combinations.forEach((combination) => {
-    const key = agencyCombinationKey(combination);
-    if (key) unique.set(key, formatAgencyCombination(combination));
-  });
-  return Array.from(unique, ([key, label]) => ({ key, label }))
-    .sort((first, second) => first.label.split(" + ").length - second.label.split(" + ").length || first.label.localeCompare(second.label));
 }
