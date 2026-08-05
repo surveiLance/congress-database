@@ -52,6 +52,10 @@ The records desk displays large result sets in pages of 20 applications by
 default. Search, filters, counts, sorting, and pagination run inside Supabase,
 so the first screen downloads only the current page rather than every
 application. Applicant-history totals are returned with those rows. The
+performance migration maintains a compact, photo-free search index beside the
+source table, so routine searches and reports do not repeatedly inspect large
+ID images. Inserts, edits, archives, restores, and deletes synchronize this
+index automatically; the original application JSON remains authoritative. The
 complete lightweight application set is loaded only when staff opens reports,
 document matching, backup/import tools, a new application, or full applicant
 history. A full record and its attached images are loaded only when staff opens
@@ -61,7 +65,8 @@ For a Supabase project created before this optimization was added, run
 [`supabase/performance.sql`](supabase/performance.sql) once in the Supabase SQL
 Editor. Until that function is installed, the application automatically falls
 back to the older compatible browser-side query and displays a compatibility
-notice. No existing application is changed by the performance migration.
+notice. No existing application is changed by the performance migration; it
+only creates and backfills the synchronized lookup table.
 
 ## Record management
 
