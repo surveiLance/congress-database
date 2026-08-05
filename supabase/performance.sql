@@ -131,7 +131,6 @@ with base as (
   select
     ar.id,
     ar.record as full_record,
-    ar.record - 'idImage' - 'idImageBack' as summary_record,
     ar.surname_normalized,
     ar.first_name_normalized,
     ar.birthday,
@@ -142,7 +141,24 @@ with base as (
     public.assistance_barangay(ar.record->>'brgy') as canonical_barangay,
     public.assistance_category(ar.record->>'category') as canonical_category,
     public.assistance_number(ar.record->>'amount') as amount_value,
-    public.assistance_record_agencies(ar.record) as agencies
+    public.assistance_record_agencies(ar.record) as agencies,
+    lower(concat_ws(' ',
+      ar.record->>'surname',
+      ar.record->>'firstName',
+      ar.record->>'middleName',
+      ar.record->>'suffix',
+      ar.record->>'birthday',
+      ar.record->>'brgy',
+      ar.record->>'address',
+      ar.record->>'diagnosis',
+      ar.record->>'remarks',
+      ar.record->>'contact',
+      ar.record->>'idNumber',
+      ar.record->>'beneficiary',
+      ar.record->>'beneficiaryName',
+      (ar.record->'familyComposition')::text,
+      (ar.record->'legacyApplication')::text
+    )) as search_text
   from public.assistance_records ar
 ),
 status_base as (
@@ -171,7 +187,7 @@ filtered as (
     (
       public.assistance_normalize(p_query) = '' or not exists (
         select 1 from regexp_split_to_table(public.assistance_normalize(p_query), ' +') token
-        where public.assistance_normalize(e.summary_record::text) not like '%' || token || '%'
+        where public.assistance_normalize(e.search_text) not like '%' || token || '%'
       )
     )
     and (
@@ -241,7 +257,7 @@ filtered as (
     and (coalesce(p_filters->>'payoutTo', '') = '' or (e.payout_date <> '' and e.payout_date <= p_filters->>'payoutTo'))
 ),
 ordered as (
-  select f.*, row_number() over (order by
+  select f.*, f.full_record - 'idImage' - 'idImageBack' as summary_record, row_number() over (order by
     case when p_filters->>'sort' = 'name' then public.assistance_normalize(concat_ws(' ', f.full_record->>'surname', f.full_record->>'firstName')) end asc,
     case when p_filters->>'sort' = 'name-desc' then public.assistance_normalize(concat_ws(' ', f.full_record->>'surname', f.full_record->>'firstName')) end desc,
     case when p_filters->>'sort' = 'oldest' then f.application_date end asc,

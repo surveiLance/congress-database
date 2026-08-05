@@ -1,21 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import AdvancedFilters, { defaultRecordFilters, RecordFilters } from "@/components/AdvancedFilters";
-import Dashboard from "@/components/Dashboard";
-import DataTransfer from "@/components/DataTransfer";
 import DistrictLogo from "@/components/DistrictLogo";
-import DocumentScanner from "@/components/DocumentScanner";
-import LocalRecordsMigration from "@/components/LocalRecordsMigration";
-import RecordFormModal from "@/components/RecordFormModal";
 import RecordTable from "@/components/RecordTable";
 import StaffAuthGate from "@/components/StaffAuthGate";
-import ViewRecordModal from "@/components/ViewRecordModal";
 import { addRecord, deleteRecord, getRecord, getRecordPage, getRecords, RecordFilterOptions, subscribeToRecordChanges, updateRecord } from "@/lib/recordStore";
 import { applicantIdentityKey } from "@/lib/applicantIdentity";
 import { getSupabaseClient } from "@/lib/supabase";
 import { AssistanceRecord } from "@/lib/types";
 import { filterAndSortRecords } from "@/lib/recordQuery";
+
+const Dashboard = dynamic(() => import("@/components/Dashboard"), {
+  loading: () => <WorkspaceLoading label="Opening district reports…" />,
+});
+const DataTransfer = dynamic(() => import("@/components/DataTransfer"), {
+  loading: () => <WorkspaceLoading label="Opening data transfer tools…" />,
+});
+const DocumentScanner = dynamic(() => import("@/components/DocumentScanner"), {
+  loading: () => <WorkspaceLoading label="Opening document matching…" />,
+});
+const LocalRecordsMigration = dynamic(() => import("@/components/LocalRecordsMigration"));
+const RecordFormModal = dynamic(() => import("@/components/RecordFormModal"));
+const ViewRecordModal = dynamic(() => import("@/components/ViewRecordModal"));
 
 type Workspace = "records" | "matching" | "reports" | "utilities";
 
@@ -555,13 +563,15 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
           onSave={save}
         />
       )}
-      <ViewRecordModal
-        record={selected}
-        allRecords={supportRecords || records}
-        onClose={() => setSelected(null)}
-        onView={openViewRecord}
-        onUpdate={saveHouseholdDecision}
-      />
+      {selected && (
+        <ViewRecordModal
+          record={selected}
+          allRecords={supportRecords || records}
+          onClose={() => setSelected(null)}
+          onView={openViewRecord}
+          onUpdate={saveHouseholdDecision}
+        />
+      )}
     </main>
   );
 }
