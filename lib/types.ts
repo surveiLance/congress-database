@@ -42,6 +42,10 @@ export interface AssistanceRecord {
   id?: number;
   /** Client-only loading hint. Never persisted to Supabase or exports. */
   recordLoadState?: "summary" | "full";
+  /** Client-only aggregate supplied by the paginated records query. */
+  historyApplicationCount?: number;
+  /** Client-only aggregate supplied by the paginated records query. */
+  historyTotalGranted?: number;
   surname: string;
   firstName: string;
   middleName: string;

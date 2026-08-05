@@ -8,10 +8,36 @@ import {
   updateRecord as updateLocalRecord,
 } from "./indexedDb";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabase";
+import type { RecordFilters } from "@/components/AdvancedFilters";
+import { filterAndSortRecords } from "./recordQuery";
 
 interface SharedRecordRow {
   id: number | string;
   record: Partial<AssistanceRecord>;
+}
+
+export interface RecordFilterOptions {
+  barangays: string[];
+  assistanceTypes: string[];
+  sexes: string[];
+  categories: string[];
+  employmentStatuses: string[];
+}
+
+export interface RecordPageResult {
+  records: AssistanceRecord[];
+  total: number;
+  activeCount: number;
+  archivedCount: number;
+  filterOptions: RecordFilterOptions;
+  fastPath: boolean;
+}
+
+interface RecordPageRequest {
+  query: string;
+  filters: RecordFilters;
+  page: number;
+  pageSize: number;
 }
 
 export { getLocalRecords };
@@ -26,6 +52,55 @@ export async function getRecords(): Promise<AssistanceRecord[]> {
     console.warn("Lightweight record view unavailable; using the compatible full-record query.", summaryError);
     return getSharedRecords("assistance_records", false);
   }
+}
+
+export async function getRecordPage({ query, filters, page, pageSize }: RecordPageRequest): Promise<RecordPageResult> {
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await getSupabaseClient().rpc("search_assistance_records", {
+        p_query: query,
+        p_filters: filters,
+        p_page: page,
+        p_page_size: pageSize,
+      });
+      if (error) throw error;
+      const result = (data || {}) as {
+        records?: Array<SharedRecordRow & { history_application_count?: number; history_total_granted?: number }>;
+        total?: number;
+        active_count?: number;
+        archived_count?: number;
+        filter_options?: Partial<RecordFilterOptions>;
+      };
+      return {
+        records: (result.records || []).map((row) => normalizeRecord({
+          ...row.record,
+          id: Number(row.id),
+          recordLoadState: "summary",
+          historyApplicationCount: Number(row.history_application_count) || 1,
+          historyTotalGranted: Number(row.history_total_granted) || Number(row.record?.amount) || 0,
+        })),
+        total: Number(result.total) || 0,
+        activeCount: Number(result.active_count) || 0,
+        archivedCount: Number(result.archived_count) || 0,
+        filterOptions: normalizeFilterOptions(result.filter_options),
+        fastPath: true,
+      };
+    } catch (error) {
+      console.warn("Paginated database search is unavailable; using the compatible in-browser query.", error);
+    }
+  }
+
+  const allRecords = await getRecords();
+  const matching = filterAndSortRecords(allRecords, query, filters);
+  const start = (Math.max(1, page) - 1) * pageSize;
+  return {
+    records: matching.slice(start, start + pageSize),
+    total: matching.length,
+    activeCount: allRecords.filter((record) => !record.archivedAt).length,
+    archivedCount: allRecords.filter((record) => Boolean(record.archivedAt)).length,
+    filterOptions: filterOptionsFromRecords(allRecords),
+    fastPath: false,
+  };
 }
 
 async function getSharedRecords(
@@ -211,12 +286,39 @@ function toSharedPayload(record: AssistanceRecord) {
   const storedRecord: Partial<AssistanceRecord> = { ...record };
   delete storedRecord.id;
   delete storedRecord.recordLoadState;
+  delete storedRecord.historyApplicationCount;
+  delete storedRecord.historyTotalGranted;
   return {
     record: storedRecord,
     surname_normalized: normalizeIdentityPart(record.surname),
     first_name_normalized: normalizeIdentityPart(record.firstName),
     birthday: record.birthday,
   };
+}
+
+function normalizeFilterOptions(value?: Partial<RecordFilterOptions>): RecordFilterOptions {
+  return {
+    barangays: normalizeOptionArray(value?.barangays),
+    assistanceTypes: normalizeOptionArray(value?.assistanceTypes),
+    sexes: normalizeOptionArray(value?.sexes),
+    categories: normalizeOptionArray(value?.categories),
+    employmentStatuses: normalizeOptionArray(value?.employmentStatuses),
+  };
+}
+
+function filterOptionsFromRecords(records: AssistanceRecord[]): RecordFilterOptions {
+  const unique = (values: string[]) => Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  return {
+    barangays: unique(records.map((record) => record.brgy)),
+    assistanceTypes: unique(records.map((record) => record.assistanceType)),
+    sexes: unique(records.map((record) => record.sex)),
+    categories: unique(records.map((record) => record.category)),
+    employmentStatuses: unique(records.map((record) => record.employedStatus)),
+  };
+}
+
+function normalizeOptionArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(String).filter(Boolean) : [];
 }
 
 function databaseMessage(message: string): string {

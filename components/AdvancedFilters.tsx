@@ -5,6 +5,7 @@ import { AssistanceRecord } from "@/lib/types";
 import { conditionCategories } from "@/lib/conditionCategories";
 import { canonicalBarangay, canonicalCategory, canonicalLabel } from "@/lib/recordTaxonomy";
 import { assistanceAgencies } from "@/lib/assistanceAgencies";
+import type { RecordFilterOptions } from "@/lib/recordStore";
 
 export type RecordStatusFilter = "active" | "archived";
 export type RecordSort =
@@ -58,11 +59,12 @@ export const defaultRecordFilters: RecordFilters = {
 interface Props {
   filters: RecordFilters;
   records: AssistanceRecord[];
+  optionValues?: RecordFilterOptions;
   matchingCount: number;
   onChange: (filters: RecordFilters) => void;
 }
 
-export default function AdvancedFilters({ filters, records, matchingCount, onChange }: Props) {
+export default function AdvancedFilters({ filters, records, optionValues, matchingCount, onChange }: Props) {
   const [expanded, setExpanded] = useState(false);
   const update = (field: keyof RecordFilters, value: string) => {
     onChange({ ...filters, [field]: value });
@@ -70,6 +72,8 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
   const uniqueValues = (field: keyof AssistanceRecord, canonicalize = canonicalLabel) =>
     Array.from(new Set(records.map((record) => canonicalize(String(record[field] || ""))).filter(Boolean)))
       .sort((a, b) => a.localeCompare(b));
+  const canonicalOptions = (values: string[], canonicalize = canonicalLabel) =>
+    Array.from(new Set(values.map(canonicalize).filter(Boolean))).sort((a, b) => a.localeCompare(b));
   const activeFilters = getActiveFilters(filters);
   const clearFilters = () => onChange({ ...defaultRecordFilters, status: filters.status });
   const removeFilter = (filter: ActiveFilter) => {
@@ -85,8 +89,8 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
       : [...filters.agencies, agency];
     onChange({ ...filters, agencies });
   };
-  const barangays = uniqueValues("brgy", canonicalBarangay);
-  const assistanceTypes = uniqueValues("assistanceType");
+  const barangays = optionValues ? canonicalOptions(optionValues.barangays, canonicalBarangay) : uniqueValues("brgy", canonicalBarangay);
+  const assistanceTypes = optionValues?.assistanceTypes || uniqueValues("assistanceType");
 
   return (
     <section className="filters-section" aria-labelledby="advanced-filters-title">
@@ -206,10 +210,10 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
                 <Filter label="Payout date to"><input type="date" value={filters.payoutTo} onChange={(event) => update("payoutTo", event.target.value)} /></Filter>
               </FilterGroup>
               <FilterGroup title="Applicant">
-                <Filter label="Sex"><Options value={filters.sex} values={uniqueValues("sex")} allLabel="All" onChange={(value) => update("sex", value)} /></Filter>
+                <Filter label="Sex"><Options value={filters.sex} values={optionValues?.sexes || uniqueValues("sex")} allLabel="All" onChange={(value) => update("sex", value)} /></Filter>
                 <Filter label="Minimum age"><input type="number" min="0" value={filters.minAge} onChange={(event) => update("minAge", event.target.value)} /></Filter>
                 <Filter label="Maximum age"><input type="number" min="0" value={filters.maxAge} onChange={(event) => update("maxAge", event.target.value)} /></Filter>
-                <Filter label="Category"><Options value={filters.category} values={uniqueValues("category", canonicalCategory)} allLabel="All categories" onChange={(value) => update("category", value)} /></Filter>
+                <Filter label="Category"><Options value={filters.category} values={optionValues ? canonicalOptions(optionValues.categories, canonicalCategory) : uniqueValues("category", canonicalCategory)} allLabel="All categories" onChange={(value) => update("category", value)} /></Filter>
               </FilterGroup>
               <FilterGroup title="Medical">
                 <Filter label="Diagnosis or condition"><input value={filters.diagnosis} onChange={(event) => update("diagnosis", event.target.value)} placeholder="Keyword" /></Filter>
@@ -220,7 +224,7 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
                 <Filter label="Maximum family members"><input type="number" min="0" step="1" value={filters.maxHousehold} onChange={(event) => update("maxHousehold", event.target.value)} /></Filter>
               </FilterGroup>
               <FilterGroup title="Employment & financial">
-                <Filter label="Employment status"><Options value={filters.employmentStatus} values={uniqueValues("employedStatus")} allLabel="All statuses" onChange={(value) => update("employmentStatus", value)} /></Filter>
+                <Filter label="Employment status"><Options value={filters.employmentStatus} values={optionValues?.employmentStatuses || uniqueValues("employedStatus")} allLabel="All statuses" onChange={(value) => update("employmentStatus", value)} /></Filter>
                 <Filter label="Minimum monthly income"><MoneyInput value={filters.minIncome} onChange={(value) => update("minIncome", value)} /></Filter>
                 <Filter label="Maximum monthly income"><MoneyInput value={filters.maxIncome} onChange={(value) => update("maxIncome", value)} /></Filter>
                 <Filter label="Minimum monthly expenses"><MoneyInput value={filters.minExpenses} onChange={(value) => update("minExpenses", value)} /></Filter>

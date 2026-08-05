@@ -11,12 +11,11 @@ import RecordFormModal from "@/components/RecordFormModal";
 import RecordTable from "@/components/RecordTable";
 import StaffAuthGate from "@/components/StaffAuthGate";
 import ViewRecordModal from "@/components/ViewRecordModal";
-import { addRecord, deleteRecord, getRecord, getRecords, subscribeToRecordChanges, updateRecord } from "@/lib/recordStore";
-import { applicantIdentityKey, buildApplicantHistories } from "@/lib/applicantIdentity";
+import { addRecord, deleteRecord, getRecord, getRecordPage, getRecords, RecordFilterOptions, subscribeToRecordChanges, updateRecord } from "@/lib/recordStore";
+import { applicantIdentityKey } from "@/lib/applicantIdentity";
 import { getSupabaseClient } from "@/lib/supabase";
-import { AssistanceRecord, recordPayoutDate } from "@/lib/types";
-import { barangayDistrictGroup, canonicalBarangay, canonicalCategory } from "@/lib/recordTaxonomy";
-import { agencyFilterMatches } from "@/lib/assistanceAgencies";
+import { AssistanceRecord } from "@/lib/types";
+import { filterAndSortRecords } from "@/lib/recordQuery";
 
 type Workspace = "records" | "matching" | "reports" | "utilities";
 
@@ -43,6 +42,14 @@ export default function Home() {
 
 function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabase: boolean; staffEmail: string; testMode: boolean }) {
   const [records, setRecords] = useState<AssistanceRecord[]>([]);
+  const [supportRecords, setSupportRecords] = useState<AssistanceRecord[] | null>(null);
+  const [supportLoading, setSupportLoading] = useState(false);
+  const [recordTotal, setRecordTotal] = useState(0);
+  const [activeCount, setActiveCount] = useState(0);
+  const [archivedCount, setArchivedCount] = useState(0);
+  const [filterOptions, setFilterOptions] = useState<RecordFilterOptions>({ barangays: [], assistanceTypes: [], sexes: [], categories: [], employmentStatuses: [] });
+  const [recordsLoading, setRecordsLoading] = useState(true);
+  const [fastRecordPaging, setFastRecordPaging] = useState(true);
   const [workspace, setWorkspace] = useState<Workspace>("records");
   const [query, setQuery] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -54,93 +61,49 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   const [recordPage, setRecordPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const recordTableRef = useRef<HTMLDivElement>(null);
+  const supportLoadPromise = useRef<Promise<AssistanceRecord[]> | null>(null);
 
   const refresh = useCallback(async () => {
+    setRecordsLoading(true);
     try {
-      setRecords(await getRecords());
+      const result = await getRecordPage({ query, filters, page: recordPage, pageSize });
+      setRecords(result.records);
+      setRecordTotal(result.total);
+      setActiveCount(result.activeCount);
+      setArchivedCount(result.archivedCount);
+      setFilterOptions(result.filterOptions);
+      setFastRecordPaging(result.fastPath);
       setError("");
     } catch (reason) {
       console.error(reason);
       setError(sharedDatabase ? "The shared database could not be loaded." : "The local database could not be opened in this browser.");
+    } finally {
+      setRecordsLoading(false);
     }
-  }, [sharedDatabase]);
+  }, [filters, pageSize, query, recordPage, sharedDatabase]);
 
   useEffect(() => {
-    let active = true;
-    void getRecords()
-      .then((savedRecords) => {
-        if (!active) return;
-        setRecords(savedRecords);
-        setError("");
-      })
-      .catch((reason) => {
-        console.error(reason);
-        if (active) setError(sharedDatabase ? "The shared database could not be loaded." : "The local database could not be opened in this browser.");
-      });
-    return () => { active = false; };
-  }, [sharedDatabase]);
+    const timer = setTimeout(() => void refresh(), query || filters.name || filters.diagnosis ? 250 : 0);
+    return () => clearTimeout(timer);
+  }, [refresh, query, filters.name, filters.diagnosis]);
 
   useEffect(() => {
     if (!sharedDatabase) return;
     return subscribeToRecordChanges(() => {
+      setSupportRecords(null);
+      supportLoadPromise.current = null;
       void refresh();
     });
   }, [refresh, sharedDatabase]);
 
-  const activeRecords = useMemo(() => records.filter((record) => !record.archivedAt), [records]);
-  const archivedRecords = useMemo(() => records.filter((record) => Boolean(record.archivedAt)), [records]);
   const showArchived = filters.status === "archived";
-  const visibleRecords = showArchived ? archivedRecords : activeRecords;
-  const visibleHistories = useMemo(() => buildApplicantHistories(visibleRecords), [visibleRecords]);
-
-  const filtered = useMemo(() => {
-    const globalQuery = searchTokens(query);
-    const nameQuery = searchTokens(filters.name);
-    const diagnosisQuery = searchTokens(filters.diagnosis);
-    const matching = visibleRecords.filter((record) => {
-      const legacySearch = record.legacyApplication ? Object.values(record.legacyApplication).join(" ") : "";
-      const searchable = normalizeSearchText(Object.values(record)
-        .filter((value) => typeof value !== "string" || !value.startsWith("data:image/"))
-        .join(" ") + " " + legacySearch + " " + record.familyComposition.map((member) =>
-        `${member.fullName} ${member.relationship} ${member.birthday}`).join(" "));
-      const fullName = normalizeSearchText(`${record.surname} ${record.firstName} ${record.middleName} ${record.suffix}`);
-      const diagnosis = normalizeSearchText(record.diagnosis);
-      const createdDate = record.applicationDate || (record.createdAt ? record.createdAt.slice(0, 10) : "");
-      const payoutDate = recordPayoutDate(record);
-
-      return tokensMatch(globalQuery, searchable) &&
-        tokensMatch(nameQuery, fullName) &&
-        (!filters.district || barangayDistrictGroup(record.brgy) === filters.district) &&
-        (!filters.barangay || canonicalBarangay(filters.barangay) === canonicalBarangay(record.brgy)) &&
-        normalizedOptionMatches(filters.sex, record.sex) &&
-        inNumberRange(Number(record.age), filters.minAge, filters.maxAge) &&
-        inNumberRange(record.householdMembers, filters.minHousehold, filters.maxHousehold) &&
-        processingStageMatches(record, filters.processingStage) &&
-        (!filters.category || canonicalCategory(filters.category) === canonicalCategory(record.category)) &&
-        normalizedOptionMatches(filters.assistanceType, record.assistanceType) &&
-        agencyFilterMatches(record.assistanceAgencies, filters.agencies, filters.agencyMatch) &&
-        tokensMatch(diagnosisQuery, diagnosis) &&
-        (!filters.conditionCategory || record.conditionCategories.some((category) => normalizedOptionMatches(filters.conditionCategory, category))) &&
-        normalizedOptionMatches(filters.employmentStatus, record.employedStatus) &&
-        inNumberRange(record.salary, filters.minIncome, filters.maxIncome) &&
-        inNumberRange(record.monthlyExpenses, filters.minExpenses, filters.maxExpenses) &&
-        inNumberRange(record.amount, filters.minAmount, filters.maxAmount) &&
-        (!filters.createdFrom || createdDate >= filters.createdFrom) &&
-        (!filters.createdTo || createdDate <= filters.createdTo) &&
-        (!filters.payoutFrom || (Boolean(payoutDate) && payoutDate >= filters.payoutFrom)) &&
-        (!filters.payoutTo || (Boolean(payoutDate) && payoutDate <= filters.payoutTo));
-    });
-
-    return matching.sort((first, second) => compareRecords(first, second, filters.sort, visibleHistories));
-  }, [filters, query, visibleHistories, visibleRecords]);
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const firstVisibleRecord = filtered.length ? (recordPage - 1) * pageSize + 1 : 0;
-  const lastVisibleRecord = Math.min(recordPage * pageSize, filtered.length);
-  const pagedRecords = useMemo(
-    () => filtered.slice((recordPage - 1) * pageSize, recordPage * pageSize),
-    [filtered, pageSize, recordPage],
+  const filteredSupportRecords = useMemo(
+    () => supportRecords ? filterAndSortRecords(supportRecords, query, filters) : [],
+    [filters, query, supportRecords],
   );
+  const pageCount = Math.max(1, Math.ceil(recordTotal / pageSize));
+  const firstVisibleRecord = recordTotal ? (recordPage - 1) * pageSize + 1 : 0;
+  const lastVisibleRecord = Math.min(recordPage * pageSize, recordTotal);
 
   useEffect(() => {
     setRecordPage(1);
@@ -156,17 +119,40 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   };
 
   useEffect(() => {
-    const visibleIds = new Set(filtered.flatMap((record) => record.id === undefined ? [] : [record.id]));
+    const visibleIds = new Set(records.flatMap((record) => record.id === undefined ? [] : [record.id]));
     setSelectedIds((current) => {
       const next = new Set(Array.from(current).filter((id) => visibleIds.has(id)));
       return next.size === current.size && Array.from(next).every((id) => current.has(id)) ? current : next;
     });
-  }, [filtered]);
+  }, [records]);
 
   const selectedApplications = useMemo(
-    () => filtered.filter((record) => record.id !== undefined && selectedIds.has(record.id)),
-    [filtered, selectedIds],
+    () => records.filter((record) => record.id !== undefined && selectedIds.has(record.id)),
+    [records, selectedIds],
   );
+
+  const ensureSupportRecords = useCallback(async () => {
+    if (supportRecords) return supportRecords;
+    if (supportLoadPromise.current) return supportLoadPromise.current;
+    setSupportLoading(true);
+    const request = getRecords()
+      .then((savedRecords) => {
+        setSupportRecords(savedRecords);
+        return savedRecords;
+      })
+      .finally(() => {
+        supportLoadPromise.current = null;
+        setSupportLoading(false);
+      });
+    supportLoadPromise.current = request;
+    return request;
+  }, [supportRecords]);
+
+  const refreshAfterChange = useCallback(async () => {
+    setSupportRecords(null);
+    supportLoadPromise.current = null;
+    await refresh();
+  }, [refresh]);
 
   const save = async (record: AssistanceRecord) => {
     if (record.id === undefined) {
@@ -174,10 +160,17 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     } else {
       await updateRecord(record);
     }
-    await refresh();
+    await refreshAfterChange();
   };
 
-  const openNewRecord = () => {
+  const openNewRecord = async () => {
+    try {
+      await ensureSupportRecords();
+    } catch (reason) {
+      console.error(reason);
+      setError("Applicant history could not be prepared. Check the connection and try again.");
+      return;
+    }
     setEditing(null);
     setFormOpen(true);
   };
@@ -194,27 +187,37 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   };
 
   const openViewRecord = async (record: AssistanceRecord) => {
-    const complete = await loadCompleteRecord(record);
-    if (complete) setSelected(complete);
+    try {
+      const [complete] = await Promise.all([loadCompleteRecord(record), ensureSupportRecords()]);
+      if (complete) setSelected(complete);
+    } catch (reason) {
+      console.error(reason);
+      setError("Applicant history could not be loaded. Check the connection and try again.");
+    }
   };
 
   const openEditRecord = async (record: AssistanceRecord) => {
-    const complete = await loadCompleteRecord(record);
-    if (!complete) return;
-    setEditing(complete);
-    setFormOpen(true);
+    try {
+      const [complete] = await Promise.all([loadCompleteRecord(record), ensureSupportRecords()]);
+      if (!complete) return;
+      setEditing(complete);
+      setFormOpen(true);
+    } catch (reason) {
+      console.error(reason);
+      setError("The application could not be prepared for editing. Check the connection and try again.");
+    }
   };
 
   const archive = async (record: AssistanceRecord) => {
     if (record.id === undefined || !window.confirm(`Archive the record for ${record.firstName} ${record.surname}? It can be restored later.`)) return;
     await updateRecord({ ...record, archivedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
-    await refresh();
+    await refreshAfterChange();
   };
 
   const restore = async (record: AssistanceRecord) => {
     if (record.id === undefined || !window.confirm(`Restore the record for ${record.firstName} ${record.surname} to active records?`)) return;
     await updateRecord({ ...record, archivedAt: "", updatedAt: new Date().toISOString() });
-    await refresh();
+    await refreshAfterChange();
   };
 
   const permanentlyDelete = async (record: AssistanceRecord) => {
@@ -225,7 +228,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     if (response !== "DELETE") return;
     try {
       await deleteRecord(record.id);
-      await refresh();
+      await refreshAfterChange();
       setError("");
       window.alert("The archived application was permanently deleted.");
     } catch (reason) {
@@ -245,7 +248,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   };
 
   const toggleAllMatching = () => {
-    const matchingIds = filtered.flatMap((record) => record.id === undefined ? [] : [record.id]);
+    const matchingIds = records.flatMap((record) => record.id === undefined ? [] : [record.id]);
     const everyMatchingRecordSelected = matchingIds.length > 0 && matchingIds.every((id) => selectedIds.has(id));
     setSelectedIds((current) => {
       const next = new Set(current);
@@ -255,7 +258,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   };
 
   const toggleCurrentPage = () => {
-    const pageIds = pagedRecords.flatMap((record) => record.id === undefined ? [] : [record.id]);
+    const pageIds = records.flatMap((record) => record.id === undefined ? [] : [record.id]);
     const everyPageRecordSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
     setSelectedIds((current) => {
       const next = new Set(current);
@@ -271,7 +274,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
       const now = new Date().toISOString();
       await Promise.all(selectedApplications.map((record) => updateRecord({ ...record, archivedAt: now, updatedAt: now })));
       setSelectedIds(new Set());
-      await refresh();
+      await refreshAfterChange();
     } catch (reason) {
       console.error(reason);
       setError("The selected applications could not all be archived. Refresh and try again.");
@@ -285,7 +288,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
       const now = new Date().toISOString();
       await Promise.all(selectedApplications.map((record) => updateRecord({ ...record, archivedAt: "", updatedAt: now })));
       setSelectedIds(new Set());
-      await refresh();
+      await refreshAfterChange();
     } catch (reason) {
       console.error(reason);
       setError("The selected applications could not all be restored. Refresh and try again.");
@@ -301,7 +304,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     try {
       await Promise.all(selectedApplications.flatMap((record) => record.id === undefined ? [] : [deleteRecord(record.id)]));
       setSelectedIds(new Set());
-      await refresh();
+      await refreshAfterChange();
       window.alert(`${selectedApplications.length} archived application${selectedApplications.length === 1 ? " was" : "s were"} permanently deleted.`);
     } catch (reason) {
       console.error(reason);
@@ -315,14 +318,15 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     if (!complete) return false;
     if (complete.idImage && !window.confirm(`Replace the document already attached to ${record.firstName} ${record.surname}?`)) return false;
     await updateRecord({ ...complete, idImage: imageData, updatedAt: new Date().toISOString() });
-    await refresh();
+    await refreshAfterChange();
     return true;
   };
 
   const saveHouseholdDecision = async (record: AssistanceRecord) => {
+    const allRecords = await ensureSupportRecords();
     const identityKey = applicantIdentityKey(record);
     const applicantRecords = identityKey
-      ? records.filter((application) => applicantIdentityKey(application) === identityKey)
+      ? allRecords.filter((application) => applicantIdentityKey(application) === identityKey)
       : [record];
     await Promise.all(applicantRecords.map((application) => updateRecord({
       ...application,
@@ -331,8 +335,20 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
       relativeLinks: record.relativeLinks.map((link) => ({ ...link })),
       updatedAt: record.updatedAt,
     })));
+    await refreshAfterChange();
+    const refreshedSupportRecords = await getRecords();
+    setSupportRecords(refreshedSupportRecords);
     setSelected(record);
-    await refresh();
+  };
+
+  const changeWorkspace = (nextWorkspace: Workspace) => {
+    setWorkspace(nextWorkspace);
+    if (nextWorkspace !== "records") {
+      void ensureSupportRecords().catch((reason) => {
+        console.error(reason);
+        setError("The complete application set could not be loaded for this tool.");
+      });
+    }
   };
 
   return (
@@ -358,7 +374,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               Sign out
             </button>
           )}
-          <button className="btn header-action" onClick={openNewRecord}>+ New Application</button>
+          <button className="btn header-action" disabled={supportLoading} onClick={() => void openNewRecord()}>{supportLoading ? "Preparing…" : "+ New Application"}</button>
         </div>
       </header>
 
@@ -368,7 +384,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
             className={`workspace-tab${workspace === item.id ? " active" : ""}`}
             type="button"
             key={item.id}
-            onClick={() => setWorkspace(item.id)}
+            onClick={() => changeWorkspace(item.id)}
             aria-current={workspace === item.id ? "page" : undefined}
           >
             <span className="workspace-full-label">{item.label}</span>
@@ -385,6 +401,9 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
           </div>
         )}
         {error && <div className="error" role="alert">{error}</div>}
+        {sharedDatabase && !recordsLoading && !fastRecordPaging && (
+          <div className="notice warning" role="status">Records are available in compatibility mode. The Supabase performance update is still pending, so searches may take longer than normal.</div>
+        )}
 
         <div className="workspace-view" hidden={workspace !== "records"}>
             <section className="workspace-intro compact">
@@ -397,23 +416,24 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
             <div className="records-toolbar">
               <nav className="record-view-tabs" aria-label="Record views">
                 <button className={`view-tab${!showArchived ? " active" : ""}`} onClick={() => { setFilters((current) => ({ ...current, status: "active" })); setQuery(""); }}>
-                  Active <span>{activeRecords.length}</span>
+                  Active <span>{activeCount}</span>
                 </button>
                 <button className={`view-tab${showArchived ? " active" : ""}`} onClick={() => { setFilters((current) => ({ ...current, status: "archived" })); setQuery(""); }}>
-                  Archived <span>{archivedRecords.length}</span>
+                  Archived <span>{archivedCount}</span>
                 </button>
               </nav>
               <section className="search-section">
                 <label className="sr-only" htmlFor="record-search">Search records</label>
                 <input id="record-search" type="search" className="search-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${showArchived ? "archived" : "active"} records by name, birthday, barangay, diagnosis, or remarks`} />
               </section>
-              <AdvancedFilters filters={filters} records={records} matchingCount={filtered.length} onChange={setFilters} />
+              <AdvancedFilters filters={filters} records={records} optionValues={filterOptions} matchingCount={recordTotal} onChange={setFilters} />
             </div>
             {showArchived && <div className="archive-info"><strong>Archived Records</strong><span>Restore an application, or permanently delete it when it should no longer be included in applicant history and reports.</span></div>}
             <div className="record-list-controls">
               <div className="record-results" role="status">
-                <strong>{filtered.length.toLocaleString()}</strong> matching record{filtered.length === 1 ? "" : "s"}
+                <strong>{recordTotal.toLocaleString()}</strong> matching record{recordTotal === 1 ? "" : "s"}
                 <span> · showing {firstVisibleRecord.toLocaleString()}–{lastVisibleRecord.toLocaleString()}</span>
+                {recordsLoading && <span className="records-loading-status">Updating…</span>}
               </div>
               <nav className="record-pagination compact" aria-label="Record pages above table">
                 <button className="btn secondary small" type="button" disabled={recordPage === 1} onClick={() => changeRecordPage(recordPage - 1)}>Previous</button>
@@ -437,8 +457,8 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               </label>
             </div>
             <div className={`bulk-record-bar${selectedApplications.length ? " has-selection" : ""}`}>
-              <button className="bulk-select-toggle" type="button" disabled={!filtered.length} onClick={toggleAllMatching}>
-                {selectedApplications.length === filtered.length && filtered.length > 0 ? "Deselect all" : `Select all ${filtered.length || ""}`.trim()}
+              <button className="bulk-select-toggle" type="button" disabled={!records.length} onClick={toggleAllMatching}>
+                {selectedApplications.length === records.length && records.length > 0 ? "Deselect page" : `Select page (${records.length})`}
               </button>
               <span>
                 {selectedApplications.length
@@ -455,8 +475,9 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               )}
             </div>
             <RecordTable
-              records={pagedRecords}
-              allRecords={records}
+              records={records}
+              allRecords={supportRecords || records}
+              completeContext={Boolean(supportRecords)}
               archived={showArchived}
               onView={openViewRecord}
               onEdit={showArchived ? undefined : openEditRecord}
@@ -470,7 +491,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               sort={filters.sort}
               onSort={(sort) => setFilters((current) => ({ ...current, sort }))}
             />
-            {filtered.length > pageSize && (
+            {recordTotal > pageSize && (
               <nav className="record-pagination" aria-label="Record pages">
                 <button className="btn secondary small" type="button" disabled={recordPage === 1} onClick={() => changeRecordPage(recordPage - 1)}>Previous</button>
                 <span>Page <strong>{recordPage}</strong> of <strong>{pageCount}</strong></span>
@@ -487,7 +508,9 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
                 <p>OCR text and possible matches stay visible for staff review.</p>
               </div>
             </section>
-            <DocumentScanner records={activeRecords} onView={openViewRecord} onAttachDocument={attachMatchedDocument} />
+            {supportRecords
+              ? <DocumentScanner records={supportRecords.filter((record) => !record.archivedAt)} onView={openViewRecord} onAttachDocument={attachMatchedDocument} />
+              : <WorkspaceLoading label="Preparing applicant matching…" />}
         </div>
 
         {workspace === "reports" && <div className="workspace-view">
@@ -498,7 +521,9 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
                 <p>Figures use the current record filters and contain no personally identifiable information.</p>
               </div>
             </section>
-            <Dashboard records={filtered} onView={openViewRecord} />
+            {supportRecords
+              ? <Dashboard records={filteredSupportRecords} onView={openViewRecord} />
+              : <WorkspaceLoading label="Preparing complete district reports…" />}
         </div>}
 
         <div className="workspace-view" hidden={workspace !== "utilities"}>
@@ -510,8 +535,12 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               </div>
             </section>
             <div className="utility-stack">
-              {sharedDatabase && <LocalRecordsMigration sharedRecords={records} onChanged={refresh} />}
-              <DataTransfer records={records} onChanged={refresh} />
+              {supportRecords ? (
+                <>
+                  {sharedDatabase && <LocalRecordsMigration sharedRecords={supportRecords} onChanged={refreshAfterChange} />}
+                  <DataTransfer records={supportRecords} onChanged={refreshAfterChange} />
+                </>
+              ) : <WorkspaceLoading label="Preparing backup and import tools…" />}
             </div>
         </div>
       </div>
@@ -521,14 +550,14 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
           key={editing?.id ?? "new-record"}
           open
           initialRecord={editing}
-          existingRecords={records}
+          existingRecords={supportRecords || records}
           onClose={() => { setFormOpen(false); setEditing(null); }}
           onSave={save}
         />
       )}
       <ViewRecordModal
         record={selected}
-        allRecords={records}
+        allRecords={supportRecords || records}
         onClose={() => setSelected(null)}
         onView={openViewRecord}
         onUpdate={saveHouseholdDecision}
@@ -537,85 +566,6 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   );
 }
 
-function normalizeSearchText(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("en-PH")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-function searchTokens(value: string) {
-  const normalized = normalizeSearchText(value);
-  return normalized ? Array.from(new Set(normalized.split(" "))) : [];
-}
-
-function tokensMatch(tokens: string[], searchable: string) {
-  return tokens.every((token) => searchable.includes(token));
-}
-
-function normalizedOptionMatches(filterValue: string, recordValue: string) {
-  return !filterValue || normalizeSearchText(filterValue) === normalizeSearchText(recordValue);
-}
-
-function inNumberRange(value: number, minimum: string, maximum: string) {
-  if (!Number.isFinite(value)) return !minimum && !maximum;
-  return (!minimum || value >= Number(minimum)) && (!maximum || value <= Number(maximum));
-}
-
-function processingStageMatches(record: AssistanceRecord, stage: string) {
-  if (!stage) return true;
-  const applicationRecorded = Boolean(record.applicationDate);
-  const payoutCompleted = Boolean(recordPayoutDate(record));
-  if (stage === "application-recorded") return applicationRecorded;
-  if (stage === "awaiting-payout") return applicationRecorded && !payoutCompleted;
-  if (stage === "payout-completed") return payoutCompleted;
-  if (stage === "application-date-missing") return !applicationRecorded;
-  return true;
-}
-
-function compareRecords(
-  first: AssistanceRecord,
-  second: AssistanceRecord,
-  sort: RecordFilters["sort"],
-  histories: ReturnType<typeof buildApplicantHistories>,
-) {
-  const compareText = (firstValue: string, secondValue: string) => firstValue.localeCompare(secondValue, "en-PH", { sensitivity: "base" });
-  if (sort === "name" || sort === "name-desc") {
-    const result = compareText(`${first.surname} ${first.firstName}`, `${second.surname} ${second.firstName}`);
-    return sort === "name-desc" ? -result : result;
-  }
-  if (sort === "amount-high") return second.amount - first.amount;
-  if (sort === "amount-low") return first.amount - second.amount;
-  if (sort === "birthday-newest" || sort === "birthday-oldest") {
-    return compareOptionalDates(first.birthday, second.birthday, sort === "birthday-newest" ? "desc" : "asc");
-  }
-  if (sort === "barangay-asc" || sort === "barangay-desc") {
-    const result = compareText(canonicalBarangay(first.brgy), canonicalBarangay(second.brgy));
-    return sort === "barangay-desc" ? -result : result;
-  }
-  if (sort === "assistance-asc" || sort === "assistance-desc") {
-    const result = compareText(first.assistanceType, second.assistanceType);
-    return sort === "assistance-desc" ? -result : result;
-  }
-  if (sort === "payout-newest" || sort === "payout-oldest") {
-    return compareOptionalDates(recordPayoutDate(first), recordPayoutDate(second), sort === "payout-newest" ? "desc" : "asc");
-  }
-  if (sort === "history-high" || sort === "history-low") {
-    const firstTotal = histories.get(applicantIdentityKey(first))?.totalGranted ?? first.amount;
-    const secondTotal = histories.get(applicantIdentityKey(second))?.totalGranted ?? second.amount;
-    return sort === "history-high" ? secondTotal - firstTotal : firstTotal - secondTotal;
-  }
-  const firstDate = Date.parse(first.applicationDate || first.createdAt) || 0;
-  const secondDate = Date.parse(second.applicationDate || second.createdAt) || 0;
-  return sort === "oldest" ? firstDate - secondDate : secondDate - firstDate;
-}
-
-function compareOptionalDates(firstValue: string, secondValue: string, direction: "asc" | "desc") {
-  if (!firstValue && !secondValue) return 0;
-  if (!firstValue) return 1;
-  if (!secondValue) return -1;
-  const result = (Date.parse(firstValue) || 0) - (Date.parse(secondValue) || 0);
-  return direction === "desc" ? -result : result;
+function WorkspaceLoading({ label }: { label: string }) {
+  return <div className="workspace-loading" role="status"><span className="loading-spinner" aria-hidden="true" /><strong>{label}</strong></div>;
 }

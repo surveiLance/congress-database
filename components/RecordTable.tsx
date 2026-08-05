@@ -20,6 +20,7 @@ interface Props {
   containerRef?: Ref<HTMLDivElement>;
   sort?: RecordSort;
   onSort?: (sort: RecordSort) => void;
+  completeContext?: boolean;
 }
 
 export default function RecordTable({
@@ -37,6 +38,7 @@ export default function RecordTable({
   containerRef,
   sort = "newest",
   onSort,
+  completeContext = true,
 }: Props) {
   const histories = useMemo(() => buildApplicantHistories(allRecords), [allRecords]);
   const selectableIds = records.flatMap((record) => record.id === undefined ? [] : [record.id]);
@@ -70,7 +72,9 @@ export default function RecordTable({
           {!records.length && <tr><td colSpan={onToggleSelected ? 10 : 9} className="empty">No records found.</td></tr>}
           {records.map((record) => {
             const history = histories.get(applicantIdentityKey(record));
-            const household = householdSummaryForRecord(record, allRecords, histories);
+            const household = completeContext ? householdSummaryForRecord(record, allRecords, histories) : null;
+            const historyCount = record.historyApplicationCount ?? history?.applicationCount ?? 1;
+            const historyTotal = record.historyTotalGranted ?? history?.totalGranted ?? record.amount;
             const selected = record.id !== undefined && selectedIds.has(record.id);
             return (
             <tr className={selected ? "selected-record-row" : ""} key={record.id}>
@@ -97,13 +101,13 @@ export default function RecordTable({
               </td>
               <td><strong>{formatPeso(record.amount)}</strong></td>
               <td>
-                <div className={`history-summary${(history?.applicationCount || 0) > 1 ? " returning" : ""}`}>
-                  <strong>{formatPeso(history?.totalGranted || record.amount)}</strong>
-                  <span>{history?.applicationCount || 1} application{(history?.applicationCount || 1) === 1 ? "" : "s"} total</span>
-                  {household.confirmedConnections.length > 0 && (
+                <div className={`history-summary${historyCount > 1 ? " returning" : ""}`}>
+                  <strong>{formatPeso(historyTotal)}</strong>
+                  <span>{historyCount} application{historyCount === 1 ? "" : "s"} total</span>
+                  {household && household.confirmedConnections.length > 0 && (
                     <span className="household-confirmed-mini">Household: {formatPeso(household.confirmedAssistance)}</span>
                   )}
-                  {household.possibleConnections.length > 0 && (
+                  {household && household.possibleConnections.length > 0 && (
                     <span className="household-possible-mini">{household.possibleConnections.length} family match{household.possibleConnections.length === 1 ? "" : "es"} to review</span>
                   )}
                 </div>
