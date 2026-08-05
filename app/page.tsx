@@ -16,6 +16,7 @@ import { applicantIdentityKey, buildApplicantHistories } from "@/lib/applicantId
 import { getSupabaseClient } from "@/lib/supabase";
 import { AssistanceRecord, recordPayoutDate } from "@/lib/types";
 import { barangayDistrictGroup, canonicalBarangay, canonicalCategory } from "@/lib/recordTaxonomy";
+import { agencyFilterMatches } from "@/lib/assistanceAgencies";
 
 type Workspace = "records" | "matching" | "reports" | "utilities";
 
@@ -117,7 +118,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
         processingStageMatches(record, filters.processingStage) &&
         (!filters.category || canonicalCategory(filters.category) === canonicalCategory(record.category)) &&
         normalizedOptionMatches(filters.assistanceType, record.assistanceType) &&
-        otherAgencyMatches(record.otherAgencyAssistance, filters.otherAgency) &&
+        agencyFilterMatches(record.assistanceAgencies, filters.agencyFilter) &&
         tokensMatch(diagnosisQuery, diagnosis) &&
         (!filters.conditionCategory || record.conditionCategories.some((category) => normalizedOptionMatches(filters.conditionCategory, category))) &&
         normalizedOptionMatches(filters.employmentStatus, record.employedStatus) &&
@@ -561,13 +562,6 @@ function normalizedOptionMatches(filterValue: string, recordValue: string) {
 function inNumberRange(value: number, minimum: string, maximum: string) {
   if (!Number.isFinite(value)) return !minimum && !maximum;
   return (!minimum || value >= Number(minimum)) && (!maximum || value <= Number(maximum));
-}
-
-function otherAgencyMatches(agencies: string[], filterValue: string) {
-  if (!filterValue) return true;
-  if (filterValue === "any") return agencies.length > 0;
-  if (filterValue === "none") return agencies.length === 0;
-  return agencies.some((agency) => normalizeSearchText(agency) === normalizeSearchText(filterValue));
 }
 
 function processingStageMatches(record: AssistanceRecord, stage: string) {

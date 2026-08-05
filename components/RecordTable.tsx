@@ -3,6 +3,7 @@ import { applicantIdentityKey, buildApplicantHistories, formatPeso } from "@/lib
 import { householdSummaryForRecord } from "@/lib/householdMatching";
 import { AssistanceRecord, recordPayoutDate } from "@/lib/types";
 import type { RecordSort } from "@/components/AdvancedFilters";
+import { formatAgencyCombination } from "@/lib/assistanceAgencies";
 
 interface Props {
   records: AssistanceRecord[];
@@ -88,7 +89,12 @@ export default function RecordTable({
               <td>{record.applicationDate || record.createdAt.slice(0, 10) || "—"}</td>
               <td>{record.birthday} ({record.age} yrs)</td>
               <td>{record.brgy}</td>
-              <td>{record.assistanceType}</td>
+              <td>
+                <span className="assistance-type-cell">
+                  <strong>{record.assistanceType}</strong>
+                  <small>{formatAgencyCombination(record.assistanceAgencies)}</small>
+                </span>
+              </td>
               <td><strong>{formatPeso(record.amount)}</strong></td>
               <td>
                 <div className={`history-summary${(history?.applicationCount || 0) > 1 ? " returning" : ""}`}>

@@ -2,6 +2,7 @@ import { AssistanceRecord, recordPayoutDate } from "@/lib/types";
 import { formatPeso, historyForRecord } from "@/lib/applicantIdentity";
 import Image from "next/image";
 import HouseholdConnections from "./HouseholdConnections";
+import { formatAgencyCombination } from "@/lib/assistanceAgencies";
 
 export default function ViewRecordModal({
   record,
@@ -19,7 +20,7 @@ export default function ViewRecordModal({
   if (!record) return null;
   const history = historyForRecord(record, allRecords);
   const applications = history?.records || [record];
-  const otherAgencies = Array.from(new Set(applications.flatMap((application) => application.otherAgencyAssistance)));
+  const historyAgencies = Array.from(new Set(applications.flatMap((application) => application.assistanceAgencies)));
   return (
     <div className="modal active" role="dialog" aria-modal="true" aria-labelledby="profile-title">
       <div className="modal-content">
@@ -41,14 +42,12 @@ export default function ViewRecordModal({
             <small>Across all recorded applications</small>
           </div>
         </section>
-        <section className={`other-agency-history${otherAgencies.length ? " has-records" : ""}`} aria-label="Other agency assistance">
+        <section className="other-agency-history has-records" aria-label="Agencies in applicant history">
           <div>
-            <span>Other agency assistance</span>
-            <strong>{otherAgencies.length ? otherAgencies.join(", ") : "None recorded"}</strong>
+            <span>Agencies in applicant history</span>
+            <strong>{formatAgencyCombination(historyAgencies)}</strong>
           </div>
-          <small>{otherAgencies.length
-            ? "Reported across this applicant’s recorded DSWD applications."
-            : "No assistance from DOH, CHED, TESDA, DOLE, or another agency has been recorded."}</small>
+          <small>Combined from all recorded assistance for this applicant.</small>
         </section>
         <h3 className="section-title">Application History</h3>
         <div className="application-history-list">
@@ -63,7 +62,7 @@ export default function ViewRecordModal({
             >
               <div>
                 <strong>{formatTimestamp(application.applicationDate || application.createdAt, true)}</strong>
-                <span>{application.assistanceType || "Unspecified assistance"}</span>
+                <span>{application.assistanceType || "Unspecified assistance"} · {formatAgencyCombination(application.assistanceAgencies)}</span>
               </div>
               <strong>{formatPeso(application.amount)}</strong>
               <span className={`history-status${application.archivedAt ? " archived" : ""}`}>
@@ -107,8 +106,8 @@ export default function ViewRecordModal({
           ["Amount Requested", formatPeso(record.amountRequested)],
           ["Amount Granted", formatPeso(record.amount)],
           ["Relation to Beneficiary", record.relationship || "Self"],
-          ["Other Agencies", record.otherAgencyAssistance.length ? record.otherAgencyAssistance.join(", ") : "None recorded"],
-          ...(record.otherAgencyRemarks ? [["Other Agency Notes", record.otherAgencyRemarks]] : []),
+          ["Agencies for This Application", formatAgencyCombination(record.assistanceAgencies)],
+          ...(record.otherAgencyRemarks ? [["Agency Notes", record.otherAgencyRemarks]] : []),
         ]} />
         <Details title="Beneficiary & medical details" rows={[
           ["Beneficiary Name", record.benName || "N/A"],

@@ -20,6 +20,7 @@ import {
 import { householdSummaryForRecord } from "@/lib/householdMatching";
 import { AssistanceRecord, emptyRecord, FamilyMember } from "@/lib/types";
 import { antipoloBarangays } from "@/lib/recordTaxonomy";
+import { assistanceAgencies, formatAgencyCombination } from "@/lib/assistanceAgencies";
 
 interface Props {
   open: boolean;
@@ -41,7 +42,6 @@ const familyRelationships = [
   "Uncle", "Aunt", "Nephew", "Niece", "Cousin",
   "Guardian", "Other relative", "Non-relative household member",
 ];
-const otherAgencies = ["DOH", "CHED", "TESDA", "DOLE", "Other"];
 const NEW_APPLICATION_DRAFT_KEY = "new-application";
 const today = () => new Date().toISOString().slice(0, 10);
 const freshRecord = (): AssistanceRecord => ({ ...emptyRecord, applicationDate: today() });
@@ -186,8 +186,6 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
       diagnosis: existing.diagnosis,
       conditionCategories: [...existing.conditionCategories],
       conditionOther: existing.conditionOther,
-      otherAgencyAssistance: [...existing.otherAgencyAssistance],
-      otherAgencyRemarks: existing.otherAgencyRemarks,
     }));
     setCopiedApplicantKey(applicantHistory.key);
   };
@@ -209,14 +207,16 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
     });
   };
 
-  const toggleOtherAgency = (agency: string) => {
+  const toggleAssistanceAgency = (agency: string) => {
     setForm((current) => {
-      const selected = current.otherAgencyAssistance.includes(agency);
+      const selected = current.assistanceAgencies.includes(agency);
+      const assistanceAgencySelection = selected
+        ? current.assistanceAgencies.filter((item) => item !== agency)
+        : [...current.assistanceAgencies, agency];
       return {
         ...current,
-        otherAgencyAssistance: selected
-          ? current.otherAgencyAssistance.filter((item) => item !== agency)
-          : [...current.otherAgencyAssistance, agency],
+        assistanceAgencies: assistanceAgencySelection,
+        otherAgencyAssistance: assistanceAgencySelection.filter((item) => item !== "DSWD"),
         otherAgencyRemarks: agency === "Other" && selected ? "" : current.otherAgencyRemarks,
       };
     });
@@ -304,6 +304,10 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (!form.assistanceAgencies.length) {
+      setSaveError("Select at least one agency for this assistance before saving.");
+      return;
+    }
     setSaving(true);
     setSaveError("");
     try {
@@ -552,23 +556,28 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                 <Field label="Amount Granted (₱) *"><input required type="number" min="0" step=".01" value={form.amount} onFocus={selectInitialZero} onChange={(e) => update("amount", Number(e.target.value))} /></Field>
                 <Field label="Relationship to Beneficiary"><input value={form.relationship} placeholder="e.g. Self, Parent, Child" onChange={(e) => update("relationship", e.target.value)} /></Field>
                 <fieldset className="form-group full-width condition-selector other-agency-selector">
-                  <legend>Previously Assisted by Other Agencies <span>(optional)</span></legend>
-                  <p>This DSWD record remains the main application. Select only agencies the applicant reports having received assistance from.</p>
+                  <legend>Agencies for This Assistance *</legend>
+                  <p>Select every agency connected to this application. Existing imported records are treated as DSWD unless staff records another combination.</p>
                   <div className="condition-options">
-                    {otherAgencies.map((agency) => (
+                    {assistanceAgencies.map((agency) => (
                       <label key={agency}>
                         <input
                           type="checkbox"
-                          checked={form.otherAgencyAssistance.includes(agency)}
-                          onChange={() => toggleOtherAgency(agency)}
+                          checked={form.assistanceAgencies.includes(agency)}
+                          onChange={() => toggleAssistanceAgency(agency)}
                         />
                         <span>{agency}</span>
                       </label>
                     ))}
                   </div>
+                  <div className={`agency-selection-summary${form.assistanceAgencies.length ? " complete" : ""}`} role="status">
+                    <span>This application will be recorded as</span>
+                    <strong>{form.assistanceAgencies.length ? formatAgencyCombination(form.assistanceAgencies) : "No agency selected"}</strong>
+                  </div>
+                  {!form.assistanceAgencies.length && <strong className="agency-selection-error">Choose at least one agency.</strong>}
                 </fieldset>
-                {form.otherAgencyAssistance.length > 0 && (
-                  <Field label="Other agency assistance notes" full>
+                {form.assistanceAgencies.some((agency) => agency !== "DSWD") && (
+                  <Field label="Agency assistance notes" full>
                     <input
                       value={form.otherAgencyRemarks}
                       onChange={(event) => update("otherAgencyRemarks", event.target.value)}

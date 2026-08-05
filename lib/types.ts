@@ -1,4 +1,5 @@
 import { normalizeConditionCategories } from "./conditionCategories";
+import { normalizeAssistanceAgencies } from "./assistanceAgencies";
 
 export interface FamilyMember {
   fullName: string;
@@ -65,6 +66,8 @@ export interface AssistanceRecord {
   civilStatus: string;
   category: string;
   assistanceType: string;
+  assistanceAgencies: string[];
+  /** @deprecated Kept so older JSON/CSV backups remain importable. */
   otherAgencyAssistance: string[];
   otherAgencyRemarks: string;
   amountRequested: number;
@@ -96,7 +99,7 @@ export const emptyRecord: AssistanceRecord = {
   sex: "", contact: "", idNumber: "", brgy: "", address: "", work: "", salary: 0,
   employedStatus: "Employed", householdMembers: 0, familyComposition: [],
   confirmedRelativeKeys: [], dismissedRelativeKeys: [], relativeLinks: [], totalEmployed: 0, monthlyExpenses: 0,
-  civilStatus: "", category: "", assistanceType: "", otherAgencyAssistance: [], otherAgencyRemarks: "", amountRequested: 0, amount: 0, relationship: "",
+  civilStatus: "", category: "", assistanceType: "", assistanceAgencies: ["DSWD"], otherAgencyAssistance: [], otherAgencyRemarks: "", amountRequested: 0, amount: 0, relationship: "",
   benName: "", benBday: "", benAge: "", benSex: "", benFamilyMember: "",
   benCivilStatus: "", benCategory: "", diagnosis: "", conditionCategories: [],
   conditionOther: "", remarks: "", idImage: null, idImageBack: null,
@@ -124,6 +127,7 @@ export function normalizeRecord(record: Partial<AssistanceRecord>): AssistanceRe
     totalEmployed: Number(record.totalEmployed) || 0,
     conditionCategories: normalizeConditionCategories(record.conditionCategories),
     conditionOther: record.conditionOther || "",
+    assistanceAgencies: normalizeAssistanceAgencies(record.assistanceAgencies, record.otherAgencyAssistance),
     otherAgencyAssistance: normalizeStringArray(record.otherAgencyAssistance),
     otherAgencyRemarks: record.otherAgencyRemarks || "",
     idNumber: record.idNumber || "",

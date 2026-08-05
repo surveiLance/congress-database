@@ -4,6 +4,12 @@ import { useState } from "react";
 import { AssistanceRecord } from "@/lib/types";
 import { conditionCategories } from "@/lib/conditionCategories";
 import { canonicalBarangay, canonicalCategory, canonicalLabel } from "@/lib/recordTaxonomy";
+import {
+  agencyCombinationKey,
+  agencyFilterLabel,
+  assistanceAgencies,
+  formatAgencyCombination,
+} from "@/lib/assistanceAgencies";
 
 export type RecordStatusFilter = "active" | "archived";
 export type RecordSort =
@@ -28,7 +34,7 @@ export interface RecordFilters {
   processingStage: string;
   category: string;
   assistanceType: string;
-  otherAgency: string;
+  agencyFilter: string;
   diagnosis: string;
   conditionCategory: string;
   employmentStatus: string;
@@ -48,7 +54,7 @@ export interface RecordFilters {
 
 export const defaultRecordFilters: RecordFilters = {
   name: "", district: "", barangay: "", sex: "", minAge: "", maxAge: "", minHousehold: "", maxHousehold: "", processingStage: "", category: "",
-  assistanceType: "", otherAgency: "", diagnosis: "", conditionCategory: "", employmentStatus: "", minIncome: "",
+  assistanceType: "", agencyFilter: "", diagnosis: "", conditionCategory: "", employmentStatus: "", minIncome: "",
   maxIncome: "", minExpenses: "", maxExpenses: "", minAmount: "", maxAmount: "",
   createdFrom: "", createdTo: "", payoutFrom: "", payoutTo: "", status: "active", sort: "newest",
 };
@@ -72,6 +78,7 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
   const clearFilters = () => onChange({ ...defaultRecordFilters, status: filters.status });
   const barangays = uniqueValues("brgy", canonicalBarangay);
   const assistanceTypes = uniqueValues("assistanceType");
+  const exactAgencyCombinations = buildAgencyCombinations(records);
   const householdPreset = filters.minHousehold === "5" && !filters.maxHousehold
     ? "5-plus"
     : filters.minHousehold || filters.maxHousehold
@@ -106,16 +113,15 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
         </Filter>
         <Filter label="Barangay"><Options value={filters.barangay} values={barangays} allLabel="All barangays" onChange={(value) => update("barangay", value)} /></Filter>
         <Filter label="Assistance"><Options value={filters.assistanceType} values={assistanceTypes} allLabel="All types" onChange={(value) => update("assistanceType", value)} /></Filter>
-        <Filter label="Other agency assistance">
-          <select value={filters.otherAgency} onChange={(event) => update("otherAgency", event.target.value)}>
-            <option value="">All applicants</option>
-            <option value="any">Any other agency</option>
-            <option value="none">None recorded</option>
-            <option value="DOH">DOH</option>
-            <option value="CHED">CHED</option>
-            <option value="TESDA">TESDA</option>
-            <option value="DOLE">DOLE</option>
-            <option value="Other">Other</option>
+        <Filter label="Agency combination">
+          <select value={filters.agencyFilter} onChange={(event) => update("agencyFilter", event.target.value)}>
+            <option value="">All agency combinations</option>
+            <optgroup label="Contains agency">
+              {assistanceAgencies.map((agency) => <option value={`contains:${agency}`} key={`contains-${agency}`}>Includes {agency}</option>)}
+            </optgroup>
+            <optgroup label="Exact combination">
+              {exactAgencyCombinations.map(({ key, label }) => <option value={`exact:${key}`} key={key}>{label} only</option>)}
+            </optgroup>
           </select>
         </Filter>
         <Filter label="Household size">
@@ -266,16 +272,7 @@ function getActiveFilters(filters: RecordFilters): ActiveFilter[] {
   }
   add("category", `Category: ${filters.category}`);
   add("assistanceType", `Assistance: ${filters.assistanceType}`);
-  if (filters.otherAgency) {
-    const otherAgencyLabels: Record<string, string> = {
-      any: "Other agency: Any recorded",
-      none: "Other agency: None recorded",
-    };
-    active.push({
-      field: "otherAgency",
-      label: otherAgencyLabels[filters.otherAgency] || `Other agency: ${filters.otherAgency}`,
-    });
-  }
+  if (filters.agencyFilter) active.push({ field: "agencyFilter", label: `Agencies: ${agencyFilterLabel(filters.agencyFilter)}` });
   add("diagnosis", `Diagnosis: ${filters.diagnosis}`);
   add("conditionCategory", `Condition: ${filters.conditionCategory}`);
   add("employmentStatus", `Employment: ${filters.employmentStatus}`);
@@ -327,4 +324,19 @@ function Options({ value, values, allLabel, onChange }: { value: string; values:
 
 function MoneyInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return <input type="number" min="0" step=".01" value={value} onChange={(event) => onChange(event.target.value)} placeholder="₱0.00" />;
+}
+
+function buildAgencyCombinations(records: AssistanceRecord[]) {
+  const combinations = [
+    ...assistanceAgencies.map((agency) => [agency]),
+    ...assistanceAgencies.filter((agency) => agency !== "DSWD").map((agency) => ["DSWD", agency]),
+    ...records.map((record) => record.assistanceAgencies),
+  ];
+  const unique = new Map<string, string>();
+  combinations.forEach((combination) => {
+    const key = agencyCombinationKey(combination);
+    if (key) unique.set(key, formatAgencyCombination(combination));
+  });
+  return Array.from(unique, ([key, label]) => ({ key, label }))
+    .sort((first, second) => first.label.split(" + ").length - second.label.split(" + ").length || first.label.localeCompare(second.label));
 }
