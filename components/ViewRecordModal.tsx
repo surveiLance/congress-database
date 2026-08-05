@@ -19,6 +19,7 @@ export default function ViewRecordModal({
   if (!record) return null;
   const history = historyForRecord(record, allRecords);
   const applications = history?.records || [record];
+  const otherAgencies = Array.from(new Set(applications.flatMap((application) => application.otherAgencyAssistance)));
   return (
     <div className="modal active" role="dialog" aria-modal="true" aria-labelledby="profile-title">
       <div className="modal-content">
@@ -39,6 +40,15 @@ export default function ViewRecordModal({
             <strong>{formatPeso(history?.totalGranted || record.amount)}</strong>
             <small>Across all recorded applications</small>
           </div>
+        </section>
+        <section className={`other-agency-history${otherAgencies.length ? " has-records" : ""}`} aria-label="Other agency assistance">
+          <div>
+            <span>Other agency assistance</span>
+            <strong>{otherAgencies.length ? otherAgencies.join(", ") : "None recorded"}</strong>
+          </div>
+          <small>{otherAgencies.length
+            ? "Reported across this applicant’s recorded DSWD applications."
+            : "No assistance from DOH, CHED, TESDA, DOLE, or another agency has been recorded."}</small>
         </section>
         <h3 className="section-title">Application History</h3>
         <div className="application-history-list">
@@ -97,6 +107,8 @@ export default function ViewRecordModal({
           ["Amount Requested", formatPeso(record.amountRequested)],
           ["Amount Granted", formatPeso(record.amount)],
           ["Relation to Beneficiary", record.relationship || "Self"],
+          ["Other Agencies", record.otherAgencyAssistance.length ? record.otherAgencyAssistance.join(", ") : "None recorded"],
+          ...(record.otherAgencyRemarks ? [["Other Agency Notes", record.otherAgencyRemarks]] : []),
         ]} />
         <Details title="Beneficiary & medical details" rows={[
           ["Beneficiary Name", record.benName || "N/A"],

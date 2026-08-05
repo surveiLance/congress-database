@@ -28,6 +28,7 @@ export interface RecordFilters {
   processingStage: string;
   category: string;
   assistanceType: string;
+  otherAgency: string;
   diagnosis: string;
   conditionCategory: string;
   employmentStatus: string;
@@ -47,7 +48,7 @@ export interface RecordFilters {
 
 export const defaultRecordFilters: RecordFilters = {
   name: "", district: "", barangay: "", sex: "", minAge: "", maxAge: "", minHousehold: "", maxHousehold: "", processingStage: "", category: "",
-  assistanceType: "", diagnosis: "", conditionCategory: "", employmentStatus: "", minIncome: "",
+  assistanceType: "", otherAgency: "", diagnosis: "", conditionCategory: "", employmentStatus: "", minIncome: "",
   maxIncome: "", minExpenses: "", maxExpenses: "", minAmount: "", maxAmount: "",
   createdFrom: "", createdTo: "", payoutFrom: "", payoutTo: "", status: "active", sort: "newest",
 };
@@ -105,6 +106,18 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
         </Filter>
         <Filter label="Barangay"><Options value={filters.barangay} values={barangays} allLabel="All barangays" onChange={(value) => update("barangay", value)} /></Filter>
         <Filter label="Assistance"><Options value={filters.assistanceType} values={assistanceTypes} allLabel="All types" onChange={(value) => update("assistanceType", value)} /></Filter>
+        <Filter label="Other agency assistance">
+          <select value={filters.otherAgency} onChange={(event) => update("otherAgency", event.target.value)}>
+            <option value="">All applicants</option>
+            <option value="any">Any other agency</option>
+            <option value="none">None recorded</option>
+            <option value="DOH">DOH</option>
+            <option value="CHED">CHED</option>
+            <option value="TESDA">TESDA</option>
+            <option value="DOLE">DOLE</option>
+            <option value="Other">Other</option>
+          </select>
+        </Filter>
         <Filter label="Household size">
           <select value={householdPreset} onChange={(event) => updateHouseholdPreset(event.target.value)}>
             <option value="">All household sizes</option>
@@ -253,6 +266,16 @@ function getActiveFilters(filters: RecordFilters): ActiveFilter[] {
   }
   add("category", `Category: ${filters.category}`);
   add("assistanceType", `Assistance: ${filters.assistanceType}`);
+  if (filters.otherAgency) {
+    const otherAgencyLabels: Record<string, string> = {
+      any: "Other agency: Any recorded",
+      none: "Other agency: None recorded",
+    };
+    active.push({
+      field: "otherAgency",
+      label: otherAgencyLabels[filters.otherAgency] || `Other agency: ${filters.otherAgency}`,
+    });
+  }
   add("diagnosis", `Diagnosis: ${filters.diagnosis}`);
   add("conditionCategory", `Condition: ${filters.conditionCategory}`);
   add("employmentStatus", `Employment: ${filters.employmentStatus}`);

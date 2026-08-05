@@ -41,6 +41,7 @@ const familyRelationships = [
   "Uncle", "Aunt", "Nephew", "Niece", "Cousin",
   "Guardian", "Other relative", "Non-relative household member",
 ];
+const otherAgencies = ["DOH", "CHED", "TESDA", "DOLE", "Other"];
 const NEW_APPLICATION_DRAFT_KEY = "new-application";
 const today = () => new Date().toISOString().slice(0, 10);
 const freshRecord = (): AssistanceRecord => ({ ...emptyRecord, applicationDate: today() });
@@ -185,6 +186,8 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
       diagnosis: existing.diagnosis,
       conditionCategories: [...existing.conditionCategories],
       conditionOther: existing.conditionOther,
+      otherAgencyAssistance: [...existing.otherAgencyAssistance],
+      otherAgencyRemarks: existing.otherAgencyRemarks,
     }));
     setCopiedApplicantKey(applicantHistory.key);
   };
@@ -202,6 +205,19 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
           ? current.conditionCategories.filter((item) => item !== category)
           : [...current.conditionCategories, category],
         conditionOther: category === "Other" && selected ? "" : current.conditionOther,
+      };
+    });
+  };
+
+  const toggleOtherAgency = (agency: string) => {
+    setForm((current) => {
+      const selected = current.otherAgencyAssistance.includes(agency);
+      return {
+        ...current,
+        otherAgencyAssistance: selected
+          ? current.otherAgencyAssistance.filter((item) => item !== agency)
+          : [...current.otherAgencyAssistance, agency],
+        otherAgencyRemarks: agency === "Other" && selected ? "" : current.otherAgencyRemarks,
       };
     });
   };
@@ -535,6 +551,31 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
                 <Field label="Amount Requested (₱)"><input type="number" min="0" step=".01" value={form.amountRequested} onFocus={selectInitialZero} onChange={(e) => update("amountRequested", Number(e.target.value))} /></Field>
                 <Field label="Amount Granted (₱) *"><input required type="number" min="0" step=".01" value={form.amount} onFocus={selectInitialZero} onChange={(e) => update("amount", Number(e.target.value))} /></Field>
                 <Field label="Relationship to Beneficiary"><input value={form.relationship} placeholder="e.g. Self, Parent, Child" onChange={(e) => update("relationship", e.target.value)} /></Field>
+                <fieldset className="form-group full-width condition-selector other-agency-selector">
+                  <legend>Previously Assisted by Other Agencies <span>(optional)</span></legend>
+                  <p>This DSWD record remains the main application. Select only agencies the applicant reports having received assistance from.</p>
+                  <div className="condition-options">
+                    {otherAgencies.map((agency) => (
+                      <label key={agency}>
+                        <input
+                          type="checkbox"
+                          checked={form.otherAgencyAssistance.includes(agency)}
+                          onChange={() => toggleOtherAgency(agency)}
+                        />
+                        <span>{agency}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                {form.otherAgencyAssistance.length > 0 && (
+                  <Field label="Other agency assistance notes" full>
+                    <input
+                      value={form.otherAgencyRemarks}
+                      onChange={(event) => update("otherAgencyRemarks", event.target.value)}
+                      placeholder="Optional, e.g. DOH Guarantee Letter"
+                    />
+                  </Field>
+                )}
 
                 <h3 className="section-title">8. Beneficiary & Medical Details</h3>
                 <Field label="Beneficiary Full Name" full><input value={form.benName} onChange={(e) => update("benName", e.target.value)} /></Field>
