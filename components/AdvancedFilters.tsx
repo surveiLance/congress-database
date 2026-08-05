@@ -6,7 +6,15 @@ import { conditionCategories } from "@/lib/conditionCategories";
 import { canonicalBarangay, canonicalCategory, canonicalLabel } from "@/lib/recordTaxonomy";
 
 export type RecordStatusFilter = "active" | "archived";
-export type RecordSort = "name" | "newest" | "oldest" | "amount-high" | "amount-low";
+export type RecordSort =
+  | "name" | "name-desc"
+  | "newest" | "oldest"
+  | "birthday-newest" | "birthday-oldest"
+  | "barangay-asc" | "barangay-desc"
+  | "assistance-asc" | "assistance-desc"
+  | "amount-high" | "amount-low"
+  | "payout-newest" | "payout-oldest"
+  | "history-high" | "history-low";
 
 export interface RecordFilters {
   name: string;
@@ -17,6 +25,7 @@ export interface RecordFilters {
   maxAge: string;
   minHousehold: string;
   maxHousehold: string;
+  processingStage: string;
   category: string;
   assistanceType: string;
   diagnosis: string;
@@ -30,15 +39,17 @@ export interface RecordFilters {
   maxAmount: string;
   createdFrom: string;
   createdTo: string;
+  payoutFrom: string;
+  payoutTo: string;
   status: RecordStatusFilter;
   sort: RecordSort;
 }
 
 export const defaultRecordFilters: RecordFilters = {
-  name: "", district: "", barangay: "", sex: "", minAge: "", maxAge: "", minHousehold: "", maxHousehold: "", category: "",
+  name: "", district: "", barangay: "", sex: "", minAge: "", maxAge: "", minHousehold: "", maxHousehold: "", processingStage: "", category: "",
   assistanceType: "", diagnosis: "", conditionCategory: "", employmentStatus: "", minIncome: "",
   maxIncome: "", minExpenses: "", maxExpenses: "", minAmount: "", maxAmount: "",
-  createdFrom: "", createdTo: "", status: "active", sort: "newest",
+  createdFrom: "", createdTo: "", payoutFrom: "", payoutTo: "", status: "active", sort: "newest",
 };
 
 interface Props {
@@ -101,10 +112,25 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
             {householdPreset === "custom" && <option value="custom" disabled>Custom range</option>}
           </select>
         </Filter>
+        <Filter label="Processing stage">
+          <select value={filters.processingStage} onChange={(event) => update("processingStage", event.target.value)}>
+            <option value="">All stages</option>
+            <option value="application-recorded">Application done</option>
+            <option value="awaiting-payout">Awaiting payout</option>
+            <option value="payout-completed">Payout done</option>
+            <option value="application-date-missing">Application date missing</option>
+          </select>
+        </Filter>
         <Filter label="Sort">
           <select value={filters.sort} onChange={(event) => update("sort", event.target.value)}>
-            <option value="name">Name</option><option value="newest">Newest</option><option value="oldest">Oldest</option>
-            <option value="amount-high">Amount highest</option><option value="amount-low">Amount lowest</option>
+            <option value="name">Name A–Z</option><option value="name-desc">Name Z–A</option>
+            <option value="newest">Application newest</option><option value="oldest">Application oldest</option>
+            <option value="birthday-newest">Birthday newest</option><option value="birthday-oldest">Birthday oldest</option>
+            <option value="barangay-asc">Barangay A–Z</option><option value="barangay-desc">Barangay Z–A</option>
+            <option value="assistance-asc">Assistance A–Z</option><option value="assistance-desc">Assistance Z–A</option>
+            <option value="amount-high">Grant highest</option><option value="amount-low">Grant lowest</option>
+            <option value="payout-newest">Payout latest</option><option value="payout-oldest">Payout earliest</option>
+            <option value="history-high">History total highest</option><option value="history-low">History total lowest</option>
           </select>
         </Filter>
         <button className="more-filter-button" type="button" onClick={() => setExpanded(true)} aria-haspopup="dialog">
@@ -147,6 +173,8 @@ export default function AdvancedFilters({ filters, records, matchingCount, onCha
                 <Filter label="Applicant name"><input value={filters.name} onChange={(event) => update("name", event.target.value)} placeholder="Name within current results" /></Filter>
                 <Filter label="Application date from"><input type="date" value={filters.createdFrom} onChange={(event) => update("createdFrom", event.target.value)} /></Filter>
                 <Filter label="Application date to"><input type="date" value={filters.createdTo} onChange={(event) => update("createdTo", event.target.value)} /></Filter>
+                <Filter label="Payout date from"><input type="date" value={filters.payoutFrom} onChange={(event) => update("payoutFrom", event.target.value)} /></Filter>
+                <Filter label="Payout date to"><input type="date" value={filters.payoutTo} onChange={(event) => update("payoutTo", event.target.value)} /></Filter>
               </FilterGroup>
               <FilterGroup title="Applicant">
                 <Filter label="Sex"><Options value={filters.sex} values={uniqueValues("sex")} allLabel="All" onChange={(value) => update("sex", value)} /></Filter>
@@ -214,6 +242,15 @@ function getActiveFilters(filters: RecordFilters): ActiveFilter[] {
   add("maxAge", `Age: up to ${filters.maxAge}`);
   add("minHousehold", `Household: ${filters.minHousehold}+ members`);
   add("maxHousehold", `Household: up to ${filters.maxHousehold} members`);
+  if (filters.processingStage) {
+    const stageLabels: Record<string, string> = {
+      "application-recorded": "Stage: Application done",
+      "awaiting-payout": "Stage: Awaiting payout",
+      "payout-completed": "Stage: Payout done",
+      "application-date-missing": "Stage: Application date missing",
+    };
+    active.push({ field: "processingStage", label: stageLabels[filters.processingStage] || filters.processingStage });
+  }
   add("category", `Category: ${filters.category}`);
   add("assistanceType", `Assistance: ${filters.assistanceType}`);
   add("diagnosis", `Diagnosis: ${filters.diagnosis}`);
@@ -227,13 +264,26 @@ function getActiveFilters(filters: RecordFilters): ActiveFilter[] {
   if (filters.maxAmount) active.push({ field: "maxAmount", label: `Granted: up to ${money(filters.maxAmount)}` });
   add("createdFrom", `Applied from: ${filters.createdFrom}`);
   add("createdTo", `Applied to: ${filters.createdTo}`);
+  add("payoutFrom", `Paid from: ${filters.payoutFrom}`);
+  add("payoutTo", `Paid to: ${filters.payoutTo}`);
   if (filters.sort !== defaultRecordFilters.sort) {
     const labels: Record<RecordSort, string> = {
       name: "Name",
+      "name-desc": "Name Z–A",
       newest: "Newest",
       oldest: "Oldest",
+      "birthday-newest": "Birthday newest",
+      "birthday-oldest": "Birthday oldest",
+      "barangay-asc": "Barangay A–Z",
+      "barangay-desc": "Barangay Z–A",
+      "assistance-asc": "Assistance A–Z",
+      "assistance-desc": "Assistance Z–A",
       "amount-high": "Amount highest",
       "amount-low": "Amount lowest",
+      "payout-newest": "Latest payout",
+      "payout-oldest": "Earliest payout",
+      "history-high": "History total highest",
+      "history-low": "History total lowest",
     };
     active.push({ field: "sort", label: `Sort: ${labels[filters.sort]}`, clearValue: defaultRecordFilters.sort });
   }

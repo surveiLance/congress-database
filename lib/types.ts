@@ -82,6 +82,7 @@ export interface AssistanceRecord {
   idImage: string | null;
   idImageBack: string | null;
   applicationDate: string;
+  payoutDate: string;
   legacyApplication: LegacyApplicationData | null;
   createdAt: string;
   updatedAt?: string;
@@ -97,7 +98,7 @@ export const emptyRecord: AssistanceRecord = {
   benName: "", benBday: "", benAge: "", benSex: "", benFamilyMember: "",
   benCivilStatus: "", benCategory: "", diagnosis: "", conditionCategories: [],
   conditionOther: "", remarks: "", idImage: null, idImageBack: null,
-  applicationDate: "",
+  applicationDate: "", payoutDate: "",
   legacyApplication: null,
   createdAt: "",
   updatedAt: "",
@@ -105,6 +106,7 @@ export const emptyRecord: AssistanceRecord = {
 };
 
 export function normalizeRecord(record: Partial<AssistanceRecord>): AssistanceRecord {
+  const legacyApplication = normalizeLegacyApplication(record.legacyApplication);
   return {
     ...emptyRecord,
     ...record,
@@ -124,11 +126,16 @@ export function normalizeRecord(record: Partial<AssistanceRecord>): AssistanceRe
     idImage: record.idImage || null,
     idImageBack: record.idImageBack || null,
     applicationDate: record.applicationDate || String(record.createdAt || "").slice(0, 10),
-    legacyApplication: normalizeLegacyApplication(record.legacyApplication),
+    payoutDate: record.payoutDate || legacyApplication?.payoutDate || "",
+    legacyApplication,
     createdAt: record.createdAt || new Date().toISOString(),
     updatedAt: record.updatedAt || record.createdAt || "",
     archivedAt: record.archivedAt || "",
   };
+}
+
+export function recordPayoutDate(record: AssistanceRecord): string {
+  return record.payoutDate || record.legacyApplication?.payoutDate || "";
 }
 
 function normalizeRelativeLinks(

@@ -1,7 +1,8 @@
 import { Ref, useMemo } from "react";
 import { applicantIdentityKey, buildApplicantHistories, formatPeso } from "@/lib/applicantIdentity";
 import { householdSummaryForRecord } from "@/lib/householdMatching";
-import { AssistanceRecord } from "@/lib/types";
+import { AssistanceRecord, recordPayoutDate } from "@/lib/types";
+import type { RecordSort } from "@/components/AdvancedFilters";
 
 interface Props {
   records: AssistanceRecord[];
@@ -16,6 +17,8 @@ interface Props {
   onToggleSelected?: (record: AssistanceRecord) => void;
   onToggleAll?: () => void;
   containerRef?: Ref<HTMLDivElement>;
+  sort?: RecordSort;
+  onSort?: (sort: RecordSort) => void;
 }
 
 export default function RecordTable({
@@ -31,6 +34,8 @@ export default function RecordTable({
   onToggleSelected,
   onToggleAll,
   containerRef,
+  sort = "newest",
+  onSort,
 }: Props) {
   const histories = useMemo(() => buildApplicantHistories(allRecords), [allRecords]);
   const selectableIds = records.flatMap((record) => record.id === undefined ? [] : [record.id]);
@@ -50,10 +55,18 @@ export default function RecordTable({
               />
             </th>
           )}
-          <th>Full Name</th><th>Application Date</th><th>Birthday / Age</th><th>Barangay</th><th>Assistance Type</th><th>This Grant</th><th>Applicant History</th><th>Action</th>
+          <SortHeader label="Full Name" sort={sort} ascending="name" descending="name-desc" onSort={onSort} />
+          <SortHeader label="Application Date" sort={sort} ascending="oldest" descending="newest" onSort={onSort} />
+          <SortHeader label="Birthday / Age" sort={sort} ascending="birthday-oldest" descending="birthday-newest" onSort={onSort} />
+          <SortHeader label="Barangay" sort={sort} ascending="barangay-asc" descending="barangay-desc" onSort={onSort} />
+          <SortHeader label="Assistance Type" sort={sort} ascending="assistance-asc" descending="assistance-desc" onSort={onSort} />
+          <SortHeader label="This Grant" sort={sort} ascending="amount-low" descending="amount-high" onSort={onSort} />
+          <SortHeader label="Applicant History" sort={sort} ascending="history-low" descending="history-high" onSort={onSort} />
+          <SortHeader label="Payout" sort={sort} ascending="payout-oldest" descending="payout-newest" onSort={onSort} />
+          <th>Action</th>
         </tr></thead>
         <tbody>
-          {!records.length && <tr><td colSpan={onToggleSelected ? 9 : 8} className="empty">No records found.</td></tr>}
+          {!records.length && <tr><td colSpan={onToggleSelected ? 10 : 9} className="empty">No records found.</td></tr>}
           {records.map((record) => {
             const history = histories.get(applicantIdentityKey(record));
             const household = householdSummaryForRecord(record, allRecords, histories);
@@ -89,6 +102,11 @@ export default function RecordTable({
                   )}
                 </div>
               </td>
+              <td>
+                {recordPayoutDate(record)
+                  ? <span className="payout-status completed"><strong>{recordPayoutDate(record)}</strong><small>Payout done</small></span>
+                  : <span className="payout-status pending"><strong>Pending</strong><small>No payout date</small></span>}
+              </td>
               <td className="actions">
                 <button className="btn secondary small" onClick={() => onView(record)}>View History</button>
                 {!archived && onEdit && <button className="btn secondary small" onClick={() => onEdit(record)}>Edit</button>}
@@ -101,5 +119,30 @@ export default function RecordTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function SortHeader({
+  label,
+  sort,
+  ascending,
+  descending,
+  onSort,
+}: {
+  label: string;
+  sort: RecordSort;
+  ascending: RecordSort;
+  descending: RecordSort;
+  onSort?: (sort: RecordSort) => void;
+}) {
+  const direction = sort === ascending ? "ascending" : sort === descending ? "descending" : "none";
+  const nextSort = sort === ascending ? descending : ascending;
+  return (
+    <th aria-sort={direction}>
+      <button className={`table-sort-button${direction !== "none" ? " active" : ""}`} type="button" onClick={() => onSort?.(nextSort)}>
+        <span>{label}</span>
+        <span className="table-sort-arrow" aria-hidden="true">{direction === "ascending" ? "▲" : direction === "descending" ? "▼" : "↕"}</span>
+      </button>
+    </th>
   );
 }

@@ -147,6 +147,7 @@ function mapMaipRow(
     idImage: null,
     idImageBack: null,
     applicationDate,
+    payoutDate: legacyApplication.payoutDate,
     legacyApplication,
     createdAt: applicationDate ? `${applicationDate}T00:00:00.000Z` : "",
     updatedAt: applicationDate ? `${applicationDate}T00:00:00.000Z` : "",

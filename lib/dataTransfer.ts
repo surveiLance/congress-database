@@ -9,7 +9,7 @@ export const recordFields: (keyof AssistanceRecord)[] = [
   "assistanceType", "amountRequested", "amount", "relationship", "benName", "benBday", "benAge",
   "benSex", "benFamilyMember", "benCivilStatus", "benCategory", "diagnosis",
   "conditionCategories", "conditionOther", "remarks", "idImage", "idImageBack", "createdAt",
-  "applicationDate", "legacyApplication", "updatedAt", "archivedAt",
+  "applicationDate", "payoutDate", "legacyApplication", "updatedAt", "archivedAt",
 ];
 
 const requiredFields: (keyof AssistanceRecord)[] = [
@@ -123,6 +123,12 @@ function validateRecord(source: unknown): { record: AssistanceRecord | null; err
     errors.push("Application date must use YYYY-MM-DD format.");
   } else if (applicationDate && !isRealIsoDate(applicationDate)) {
     errors.push("Application date is not a real calendar date.");
+  }
+  const payoutDate = String(raw.payoutDate || "");
+  if (payoutDate && !/^\d{4}-\d{2}-\d{2}$/.test(payoutDate)) {
+    errors.push("Payout date must use YYYY-MM-DD format.");
+  } else if (payoutDate && !isRealIsoDate(payoutDate)) {
+    errors.push("Payout date is not a real calendar date.");
   }
   const beneficiaryBirthday = String(raw.benBday || "");
   if (beneficiaryBirthday && !/^\d{4}-\d{2}-\d{2}$/.test(beneficiaryBirthday)) {

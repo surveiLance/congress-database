@@ -1,4 +1,4 @@
-import { AssistanceRecord } from "@/lib/types";
+import { AssistanceRecord, recordPayoutDate } from "@/lib/types";
 import { formatPeso, historyForRecord } from "@/lib/applicantIdentity";
 import Image from "next/image";
 import HouseholdConnections from "./HouseholdConnections";
@@ -65,6 +65,7 @@ export default function ViewRecordModal({
         <p className="selected-application-label">Selected application</p>
         <section className="selected-application-summary" aria-label="Selected application summary">
           <div><span>Application date</span><strong>{formatTimestamp(record.applicationDate || record.createdAt, true)}</strong></div>
+          <div><span>Payout</span><strong>{recordPayoutDate(record) ? formatTimestamp(recordPayoutDate(record), true) : "Awaiting payout date"}</strong></div>
           <div><span>Assistance</span><strong>{record.assistanceType || "Not recorded"}</strong></div>
           <div className="selected-grant"><span>Amount granted</span><strong>{formatPeso(record.amount)}</strong></div>
           <div><span>Beneficiary</span><strong>{record.benName || "Self / applicant"}</strong></div>
@@ -80,6 +81,7 @@ export default function ViewRecordModal({
           ["Address & Barangay", `${record.address}, Brgy. ${record.brgy}`],
           ["Civil Status & Category", `${record.civilStatus} | ${record.category}`],
           ["Application Date", formatTimestamp(record.applicationDate || record.createdAt, true)],
+          ["Payout Date", recordPayoutDate(record) ? formatTimestamp(recordPayoutDate(record), true) : "Not yet recorded"],
           ["Created", formatTimestamp(record.createdAt)],
           ["Last Updated", formatTimestamp(record.updatedAt)],
           ...(record.archivedAt ? [["Archived", formatTimestamp(record.archivedAt)]] : []),

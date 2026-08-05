@@ -530,6 +530,7 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
 
                 <h3 className="section-title">7. Assistance Granted</h3>
                 <Field label="Application Date *"><input required type="date" value={form.applicationDate} onChange={(event) => update("applicationDate", event.target.value)} /></Field>
+                <Field label="Payout Date (when completed)"><input type="date" value={form.payoutDate} onChange={(event) => update("payoutDate", event.target.value)} /></Field>
                 <Field label="Type of Assistance *"><Select required value={form.assistanceType} options={["Medical", "Food", "Financial", "Educational", "Funeral", "Burial", "Cash Relief"]} placeholder="Select Type" onChange={(v) => update("assistanceType", v)} /></Field>
                 <Field label="Amount Requested (₱)"><input type="number" min="0" step=".01" value={form.amountRequested} onFocus={selectInitialZero} onChange={(e) => update("amountRequested", Number(e.target.value))} /></Field>
                 <Field label="Amount Granted (₱) *"><input required type="number" min="0" step=".01" value={form.amount} onFocus={selectInitialZero} onChange={(e) => update("amount", Number(e.target.value))} /></Field>

@@ -12,9 +12,9 @@ import RecordTable from "@/components/RecordTable";
 import StaffAuthGate from "@/components/StaffAuthGate";
 import ViewRecordModal from "@/components/ViewRecordModal";
 import { addRecord, deleteRecord, getRecord, getRecords, subscribeToRecordChanges, updateRecord } from "@/lib/recordStore";
-import { applicantIdentityKey } from "@/lib/applicantIdentity";
+import { applicantIdentityKey, buildApplicantHistories } from "@/lib/applicantIdentity";
 import { getSupabaseClient } from "@/lib/supabase";
-import { AssistanceRecord } from "@/lib/types";
+import { AssistanceRecord, recordPayoutDate } from "@/lib/types";
 import { barangayDistrictGroup, canonicalBarangay, canonicalCategory } from "@/lib/recordTaxonomy";
 
 type Workspace = "records" | "matching" | "reports" | "utilities";
@@ -90,6 +90,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   const archivedRecords = useMemo(() => records.filter((record) => Boolean(record.archivedAt)), [records]);
   const showArchived = filters.status === "archived";
   const visibleRecords = showArchived ? archivedRecords : activeRecords;
+  const visibleHistories = useMemo(() => buildApplicantHistories(visibleRecords), [visibleRecords]);
 
   const filtered = useMemo(() => {
     const globalQuery = searchTokens(query);
@@ -104,6 +105,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
       const fullName = normalizeSearchText(`${record.surname} ${record.firstName} ${record.middleName} ${record.suffix}`);
       const diagnosis = normalizeSearchText(record.diagnosis);
       const createdDate = record.applicationDate || (record.createdAt ? record.createdAt.slice(0, 10) : "");
+      const payoutDate = recordPayoutDate(record);
 
       return tokensMatch(globalQuery, searchable) &&
         tokensMatch(nameQuery, fullName) &&
@@ -112,6 +114,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
         normalizedOptionMatches(filters.sex, record.sex) &&
         inNumberRange(Number(record.age), filters.minAge, filters.maxAge) &&
         inNumberRange(record.householdMembers, filters.minHousehold, filters.maxHousehold) &&
+        processingStageMatches(record, filters.processingStage) &&
         (!filters.category || canonicalCategory(filters.category) === canonicalCategory(record.category)) &&
         normalizedOptionMatches(filters.assistanceType, record.assistanceType) &&
         tokensMatch(diagnosisQuery, diagnosis) &&
@@ -121,11 +124,13 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
         inNumberRange(record.monthlyExpenses, filters.minExpenses, filters.maxExpenses) &&
         inNumberRange(record.amount, filters.minAmount, filters.maxAmount) &&
         (!filters.createdFrom || createdDate >= filters.createdFrom) &&
-        (!filters.createdTo || createdDate <= filters.createdTo);
+        (!filters.createdTo || createdDate <= filters.createdTo) &&
+        (!filters.payoutFrom || (Boolean(payoutDate) && payoutDate >= filters.payoutFrom)) &&
+        (!filters.payoutTo || (Boolean(payoutDate) && payoutDate <= filters.payoutTo));
     });
 
-    return matching.sort((first, second) => compareRecords(first, second, filters.sort));
-  }, [filters, query, visibleRecords]);
+    return matching.sort((first, second) => compareRecords(first, second, filters.sort, visibleHistories));
+  }, [filters, query, visibleHistories, visibleRecords]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const firstVisibleRecord = filtered.length ? (recordPage - 1) * pageSize + 1 : 0;
@@ -460,6 +465,8 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               onToggleSelected={toggleSelectedApplication}
               onToggleAll={toggleCurrentPage}
               containerRef={recordTableRef}
+              sort={filters.sort}
+              onSort={(sort) => setFilters((current) => ({ ...current, sort }))}
             />
             {filtered.length > pageSize && (
               <nav className="record-pagination" aria-label="Record pages">
@@ -555,13 +562,58 @@ function inNumberRange(value: number, minimum: string, maximum: string) {
   return (!minimum || value >= Number(minimum)) && (!maximum || value <= Number(maximum));
 }
 
-function compareRecords(first: AssistanceRecord, second: AssistanceRecord, sort: RecordFilters["sort"]) {
-  if (sort === "name") {
-    return `${first.surname} ${first.firstName}`.localeCompare(`${second.surname} ${second.firstName}`);
+function processingStageMatches(record: AssistanceRecord, stage: string) {
+  if (!stage) return true;
+  const applicationRecorded = Boolean(record.applicationDate);
+  const payoutCompleted = Boolean(recordPayoutDate(record));
+  if (stage === "application-recorded") return applicationRecorded;
+  if (stage === "awaiting-payout") return applicationRecorded && !payoutCompleted;
+  if (stage === "payout-completed") return payoutCompleted;
+  if (stage === "application-date-missing") return !applicationRecorded;
+  return true;
+}
+
+function compareRecords(
+  first: AssistanceRecord,
+  second: AssistanceRecord,
+  sort: RecordFilters["sort"],
+  histories: ReturnType<typeof buildApplicantHistories>,
+) {
+  const compareText = (firstValue: string, secondValue: string) => firstValue.localeCompare(secondValue, "en-PH", { sensitivity: "base" });
+  if (sort === "name" || sort === "name-desc") {
+    const result = compareText(`${first.surname} ${first.firstName}`, `${second.surname} ${second.firstName}`);
+    return sort === "name-desc" ? -result : result;
   }
   if (sort === "amount-high") return second.amount - first.amount;
   if (sort === "amount-low") return first.amount - second.amount;
+  if (sort === "birthday-newest" || sort === "birthday-oldest") {
+    return compareOptionalDates(first.birthday, second.birthday, sort === "birthday-newest" ? "desc" : "asc");
+  }
+  if (sort === "barangay-asc" || sort === "barangay-desc") {
+    const result = compareText(canonicalBarangay(first.brgy), canonicalBarangay(second.brgy));
+    return sort === "barangay-desc" ? -result : result;
+  }
+  if (sort === "assistance-asc" || sort === "assistance-desc") {
+    const result = compareText(first.assistanceType, second.assistanceType);
+    return sort === "assistance-desc" ? -result : result;
+  }
+  if (sort === "payout-newest" || sort === "payout-oldest") {
+    return compareOptionalDates(recordPayoutDate(first), recordPayoutDate(second), sort === "payout-newest" ? "desc" : "asc");
+  }
+  if (sort === "history-high" || sort === "history-low") {
+    const firstTotal = histories.get(applicantIdentityKey(first))?.totalGranted ?? first.amount;
+    const secondTotal = histories.get(applicantIdentityKey(second))?.totalGranted ?? second.amount;
+    return sort === "history-high" ? secondTotal - firstTotal : firstTotal - secondTotal;
+  }
   const firstDate = Date.parse(first.applicationDate || first.createdAt) || 0;
   const secondDate = Date.parse(second.applicationDate || second.createdAt) || 0;
   return sort === "oldest" ? firstDate - secondDate : secondDate - firstDate;
+}
+
+function compareOptionalDates(firstValue: string, secondValue: string, direction: "asc" | "desc") {
+  if (!firstValue && !secondValue) return 0;
+  if (!firstValue) return 1;
+  if (!secondValue) return -1;
+  const result = (Date.parse(firstValue) || 0) - (Date.parse(secondValue) || 0);
+  return direction === "desc" ? -result : result;
 }
