@@ -6,14 +6,14 @@ import { confidentMatchThreshold, ScoredRecordMatch, scoreDocumentMatches } from
 import { householdSummaryForRecord } from "@/lib/householdMatching";
 import { AssistanceRecord } from "@/lib/types";
 import HouseholdConnections from "./HouseholdConnections";
+import { getApplicantContext, getDocumentMatchCandidates } from "@/lib/recordStore";
 
 interface Props {
-  records: AssistanceRecord[];
   onView: (record: AssistanceRecord) => void;
   onAttachDocument: (record: AssistanceRecord, imageData: string) => Promise<boolean>;
 }
 
-export default function DocumentScanner({ records, onView, onAttachDocument }: Props) {
+export default function DocumentScanner({ onView, onAttachDocument }: Props) {
   const [preview, setPreview] = useState("");
   const [imageData, setImageData] = useState("");
   const [text, setText] = useState("Upload or snap a photo of an ID/document to extract details and search existing records.");
@@ -23,6 +23,7 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
   const [attaching, setAttaching] = useState(false);
   const [attached, setAttached] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [matchContextRecords, setMatchContextRecords] = useState<AssistanceRecord[]>([]);
 
   const scanFile = async (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -35,6 +36,7 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
     setImageData(await fileToDataUrl(file));
     setBusy(true);
     setMatches(null);
+    setMatchContextRecords([]);
     setConfirmedId(null);
     setAttached(false);
     setText("Analyzing image and reading text using OCR...");
@@ -45,7 +47,11 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
       await worker.terminate();
       const extracted = result.data.text || "";
       setText(extracted || "No legible text recognized.");
-      setMatches(scoreDocumentMatches(extracted, records));
+      const candidates = await getDocumentMatchCandidates(extracted);
+      const scored = scoreDocumentMatches(extracted, candidates);
+      setMatches(scored);
+      const contexts = await Promise.all(scored.map((match) => getApplicantContext(match.record)));
+      setMatchContextRecords(dedupeRecords([...candidates, ...contexts.flat()]));
     } catch (error) {
       console.error(error);
       setText("Error reading document text. Please try again with a clearer photo.");
@@ -143,7 +149,7 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
                 {matches.map((match, index) => {
                   const { record } = match;
                   const isConfirmed = record.id !== undefined && confirmedId === record.id;
-                  const household = householdSummaryForRecord(record, records);
+                  const household = householdSummaryForRecord(record, matchContextRecords);
                   return (
                     <tr key={record.id}>
                       <td>#{index + 1}</td>
@@ -195,7 +201,7 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
                   {attached ? "Document Attached ✓" : attaching ? "Attaching…" : "Attach Document to Record"}
                 </button>
               </div>
-              <HouseholdConnections record={confirmedMatch.record} allRecords={records} compact />
+              <HouseholdConnections record={confirmedMatch.record} allRecords={matchContextRecords} compact />
               {attached && <div className="confirmed-match-message" role="status">The scanned document is now attached to this existing record.</div>}
             </section>
           )}
@@ -203,6 +209,12 @@ export default function DocumentScanner({ records, onView, onAttachDocument }: P
       )}
     </>
   );
+}
+
+function dedupeRecords(records: AssistanceRecord[]): AssistanceRecord[] {
+  const unique = new Map<number | string, AssistanceRecord>();
+  records.forEach((record, index) => unique.set(record.id ?? `new-${index}`, record));
+  return Array.from(unique.values());
 }
 
 function DetectedFields({ match }: { match: ScoredRecordMatch }) {

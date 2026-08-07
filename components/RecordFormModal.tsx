@@ -26,6 +26,8 @@ interface Props {
   open: boolean;
   initialRecord: AssistanceRecord | null;
   existingRecords: AssistanceRecord[];
+  onFindExistingApplicants: (surname: string, firstName: string, birthday: string) => Promise<AssistanceRecord[]>;
+  onFindHouseholdCandidates: (record: AssistanceRecord) => Promise<AssistanceRecord[]>;
   onClose: () => void;
   onSave: (record: AssistanceRecord) => Promise<void>;
 }
@@ -57,7 +59,7 @@ function ageFromBirthday(value: string) {
   return String(Math.max(0, age));
 }
 
-export default function RecordFormModal({ open, initialRecord, existingRecords, onClose, onSave }: Props) {
+export default function RecordFormModal({ open, initialRecord, existingRecords, onFindExistingApplicants, onFindHouseholdCandidates, onClose, onSave }: Props) {
   const [form, setForm] = useState<AssistanceRecord>(() => initialRecord ? { ...initialRecord } : freshRecord());
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -68,6 +70,8 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
   const [savingDraft, setSavingDraft] = useState(false);
   const [draftError, setDraftError] = useState("");
   const [dragTarget, setDragTarget] = useState<"idImage" | "idImageBack" | null>(null);
+  const [applicantLookupRecords, setApplicantLookupRecords] = useState<AssistanceRecord[]>(existingRecords);
+  const [householdLookupRecords, setHouseholdLookupRecords] = useState<AssistanceRecord[]>(existingRecords);
 
   const currentApplicantKey = applicantIdentityKey({
     surname: form.surname,
@@ -80,7 +84,7 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
     const firstName = normalizeIdentityPart(form.firstName);
     if (!surname || !firstName) return [];
 
-    return Array.from(buildApplicantHistories(existingRecords).values())
+    return Array.from(buildApplicantHistories(applicantLookupRecords).values())
       .filter((history) => {
         const latest = history.latestApplication;
         const sameName = normalizeIdentityPart(latest.surname) === surname &&
@@ -93,7 +97,7 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
       }))
       .filter((history) => history.priorApplications.length > 0)
       .sort((first, second) => (Date.parse(second.latestApplicationDate) || 0) - (Date.parse(first.latestApplicationDate) || 0));
-  }, [currentApplicantKey, existingRecords, form.firstName, form.surname, initialRecord?.id]);
+  }, [applicantLookupRecords, currentApplicantKey, form.firstName, form.surname, initialRecord?.id]);
 
   const householdReview = useMemo(() => {
     const hasHouseholdClue = Boolean(
@@ -103,9 +107,39 @@ export default function RecordFormModal({ open, initialRecord, existingRecords, 
       form.familyComposition.some((member) => member.fullName.trim()),
     );
     if (!hasHouseholdClue) return null;
-    const summary = householdSummaryForRecord(form, existingRecords);
+    const summary = householdSummaryForRecord(form, householdLookupRecords);
     return summary.connections.length ? summary : null;
-  }, [existingRecords, form]);
+  }, [form, householdLookupRecords]);
+
+  useEffect(() => {
+    const surname = form.surname.trim();
+    const firstName = form.firstName.trim();
+    if (!surname || !firstName) {
+      setApplicantLookupRecords(existingRecords);
+      return;
+    }
+    let active = true;
+    const timer = window.setTimeout(() => {
+      void onFindExistingApplicants(surname, firstName, form.birthday)
+        .then((records) => { if (active) setApplicantLookupRecords(records); })
+        .catch((reason) => console.error("Applicant lookup failed", reason));
+    }, 300);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [existingRecords, form.birthday, form.firstName, form.surname, onFindExistingApplicants]);
+
+  useEffect(() => {
+    if (form.surname.trim().length < 2) {
+      setHouseholdLookupRecords(existingRecords);
+      return;
+    }
+    let active = true;
+    const timer = window.setTimeout(() => {
+      void onFindHouseholdCandidates(form)
+        .then((records) => { if (active) setHouseholdLookupRecords(records); })
+        .catch((reason) => console.error("Household lookup failed", reason));
+    }, 600);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [existingRecords, form, onFindHouseholdCandidates]);
 
   useEffect(() => {
     if (initialRecord) return;

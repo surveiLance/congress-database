@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   applicantIdentityKey,
   buildApplicantHistories,
@@ -12,6 +12,7 @@ import {
   householdSummaryForRecord,
 } from "@/lib/householdMatching";
 import { AssistanceRecord, RelativeLink } from "@/lib/types";
+import { searchApplicantDirectory } from "@/lib/recordStore";
 
 const relationshipOptions = [
   "Spouse", "Husband", "Wife", "Partner", "Father", "Mother", "Son", "Daughter",
@@ -42,6 +43,7 @@ export default function HouseholdConnections({
   const [relationship, setRelationship] = useState("");
   const [householdDecision, setHouseholdDecision] = useState<"same-household" | "different-household">("same-household");
   const [manualSearch, setManualSearch] = useState("");
+  const [manualLookupRecords, setManualLookupRecords] = useState<AssistanceRecord[]>([]);
   const summary = householdSummaryForRecord(record, allRecords);
   const nameOnlyConnections = summary.nameOnlyConnections;
   const primaryConnections = summary.connections.filter(
@@ -52,7 +54,7 @@ export default function HouseholdConnections({
     const query = normalizeIdentityPart(manualSearch);
     if (query.length < 2) return [];
     const currentKey = applicantIdentityKey(record);
-    return Array.from(buildApplicantHistories(allRecords).values())
+    return Array.from(buildApplicantHistories([...allRecords, ...manualLookupRecords]).values())
       .filter((history) => history.key !== currentKey)
       .filter((history) => {
         const applicant = history.latestApplication;
@@ -81,7 +83,21 @@ export default function HouseholdConnections({
         reasons: ["Found by staff search"],
         declaredRelationship: record.relativeLinks.find((link) => link.key === history.key)?.relationship || "",
       }));
-  }, [allRecords, manualSearch, record]);
+  }, [allRecords, manualLookupRecords, manualSearch, record]);
+
+  useEffect(() => {
+    if (normalizeIdentityPart(manualSearch).length < 2) {
+      setManualLookupRecords([]);
+      return;
+    }
+    let active = true;
+    const timer = window.setTimeout(() => {
+      void searchApplicantDirectory(manualSearch)
+        .then((records) => { if (active) setManualLookupRecords(records); })
+        .catch((reason) => console.error("Family member search failed", reason));
+    }, 250);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [manualSearch]);
 
   const updateConnection = async (
     connection: HouseholdConnection,

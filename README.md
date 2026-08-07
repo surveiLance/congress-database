@@ -55,13 +55,16 @@ application. Applicant-history totals are returned with those rows. The
 performance migration maintains a compact, photo-free search index beside the
 source table, so routine searches do not repeatedly inspect large
 ID images. Inserts, edits, archives, restores, and deletes synchronize this
-index automatically; the original application JSON remains authoritative. The
+index automatically; the original application JSON remains authoritative.
 Reports are calculated inside Supabase and return only aggregate cards and
-chart points; opening a chart requests one 20-row application page. The
-complete lightweight application set is loaded only when staff opens document
-matching, backup/import tools, a new application, or full applicant
-history. A full record and its attached images are loaded only when staff opens
-or edits that application.
+chart points; opening a chart requests one 20-row application page. Daily
+workflows also use focused lookups: the form requests only exact-name history
+and likely household candidates, applicant history requests only that person
+and plausible relatives, and document matching requests a capped OCR candidate
+set before applying the existing score. The complete lightweight application
+set is loaded only when staff deliberately opens backup/import tools in
+Utilities. A full record and its attached images are loaded only when staff
+opens or edits that application.
 
 For a Supabase project created before this optimization was added, run
 [`supabase/performance.sql`](supabase/performance.sql) once in the Supabase SQL

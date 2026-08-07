@@ -6,8 +6,7 @@ import AdvancedFilters, { defaultRecordFilters, RecordFilters } from "@/componen
 import DistrictLogo from "@/components/DistrictLogo";
 import RecordTable from "@/components/RecordTable";
 import StaffAuthGate from "@/components/StaffAuthGate";
-import { addRecord, deleteRecord, getRecord, getRecordPage, getRecords, RecordFilterOptions, subscribeToRecordChanges, updateRecord } from "@/lib/recordStore";
-import { applicantIdentityKey } from "@/lib/applicantIdentity";
+import { addRecord, deleteRecord, findExistingApplicantRecords, getApplicantContext, getRecord, getRecordPage, getRecords, RecordFilterOptions, subscribeToRecordChanges, updateRecord } from "@/lib/recordStore";
 import { getSupabaseClient } from "@/lib/supabase";
 import { AssistanceRecord } from "@/lib/types";
 
@@ -50,7 +49,6 @@ export default function Home() {
 function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabase: boolean; staffEmail: string; testMode: boolean }) {
   const [records, setRecords] = useState<AssistanceRecord[]>([]);
   const [supportRecords, setSupportRecords] = useState<AssistanceRecord[] | null>(null);
-  const [supportLoading, setSupportLoading] = useState(false);
   const [recordTotal, setRecordTotal] = useState(0);
   const [activeCount, setActiveCount] = useState(0);
   const [archivedCount, setArchivedCount] = useState(0);
@@ -63,6 +61,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<AssistanceRecord | null>(null);
   const [selected, setSelected] = useState<AssistanceRecord | null>(null);
+  const [selectedContextRecords, setSelectedContextRecords] = useState<AssistanceRecord[]>([]);
   const [filters, setFilters] = useState<RecordFilters>({ ...defaultRecordFilters });
   const [error, setError] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
@@ -139,7 +138,6 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   const ensureSupportRecords = useCallback(async () => {
     if (supportRecords) return supportRecords;
     if (supportLoadPromise.current) return supportLoadPromise.current;
-    setSupportLoading(true);
     const request = getRecords()
       .then((savedRecords) => {
         setSupportRecords(savedRecords);
@@ -147,7 +145,6 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
       })
       .finally(() => {
         supportLoadPromise.current = null;
-        setSupportLoading(false);
       });
     supportLoadPromise.current = request;
     return request;
@@ -169,14 +166,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     await refreshAfterChange();
   };
 
-  const openNewRecord = async () => {
-    try {
-      await ensureSupportRecords();
-    } catch (reason) {
-      console.error(reason);
-      setError("Applicant history could not be prepared. Check the connection and try again.");
-      return;
-    }
+  const openNewRecord = () => {
     setEditing(null);
     setFormOpen(true);
   };
@@ -194,8 +184,11 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
 
   const openViewRecord = async (record: AssistanceRecord) => {
     try {
-      const [complete] = await Promise.all([loadCompleteRecord(record), ensureSupportRecords()]);
-      if (complete) setSelected(complete);
+      const [complete, context] = await Promise.all([loadCompleteRecord(record), getApplicantContext(record)]);
+      if (complete) {
+        setSelectedContextRecords(context);
+        setSelected(complete);
+      }
     } catch (reason) {
       console.error(reason);
       setError("Applicant history could not be loaded. Check the connection and try again.");
@@ -204,7 +197,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
 
   const openEditRecord = async (record: AssistanceRecord) => {
     try {
-      const [complete] = await Promise.all([loadCompleteRecord(record), ensureSupportRecords()]);
+      const complete = await loadCompleteRecord(record);
       if (!complete) return;
       setEditing(complete);
       setFormOpen(true);
@@ -329,11 +322,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   };
 
   const saveHouseholdDecision = async (record: AssistanceRecord) => {
-    const allRecords = await ensureSupportRecords();
-    const identityKey = applicantIdentityKey(record);
-    const applicantRecords = identityKey
-      ? allRecords.filter((application) => applicantIdentityKey(application) === identityKey)
-      : [record];
+    const applicantRecords = await findExistingApplicantRecords(record.surname, record.firstName, record.birthday);
     await Promise.all(applicantRecords.map((application) => updateRecord({
       ...application,
       confirmedRelativeKeys: [...record.confirmedRelativeKeys],
@@ -342,14 +331,17 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
       updatedAt: record.updatedAt,
     })));
     await refreshAfterChange();
-    const refreshedSupportRecords = await getRecords();
-    setSupportRecords(refreshedSupportRecords);
-    setSelected(record);
+    const [complete, context] = await Promise.all([
+      record.id === undefined ? Promise.resolve(record) : getRecord(record.id),
+      getApplicantContext(record),
+    ]);
+    setSelectedContextRecords(context);
+    setSelected(complete);
   };
 
   const changeWorkspace = (nextWorkspace: Workspace) => {
     setWorkspace(nextWorkspace);
-    if (nextWorkspace === "matching" || nextWorkspace === "utilities") {
+    if (nextWorkspace === "utilities") {
       void ensureSupportRecords().catch((reason) => {
         console.error(reason);
         setError("The complete application set could not be loaded for this tool.");
@@ -380,7 +372,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               Sign out
             </button>
           )}
-          <button className="btn header-action" disabled={supportLoading} onClick={() => void openNewRecord()}>{supportLoading ? "Preparing…" : "+ New Application"}</button>
+          <button className="btn header-action" onClick={openNewRecord}>+ New Application</button>
         </div>
       </header>
 
@@ -514,9 +506,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
                 <p>OCR text and possible matches stay visible for staff review.</p>
               </div>
             </section>
-            {supportRecords
-              ? <DocumentScanner records={supportRecords.filter((record) => !record.archivedAt)} onView={openViewRecord} onAttachDocument={attachMatchedDocument} />
-              : <WorkspaceLoading label="Preparing applicant matching…" />}
+            <DocumentScanner onView={openViewRecord} onAttachDocument={attachMatchedDocument} />
         </div>
 
         {workspace === "reports" && <div className="workspace-view">
@@ -555,6 +545,8 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
           open
           initialRecord={editing}
           existingRecords={supportRecords || records}
+          onFindExistingApplicants={findExistingApplicantRecords}
+          onFindHouseholdCandidates={getApplicantContext}
           onClose={() => { setFormOpen(false); setEditing(null); }}
           onSave={save}
         />
@@ -562,8 +554,8 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
       {selected && (
         <ViewRecordModal
           record={selected}
-          allRecords={supportRecords || records}
-          onClose={() => setSelected(null)}
+          allRecords={selectedContextRecords}
+          onClose={() => { setSelected(null); setSelectedContextRecords([]); }}
           onView={openViewRecord}
           onUpdate={saveHouseholdDecision}
         />

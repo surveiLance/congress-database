@@ -17,6 +17,11 @@ interface SharedRecordRow {
   record: Partial<AssistanceRecord>;
 }
 
+interface IndexedRecordRow {
+  record_id: number | string;
+  summary_record: Partial<AssistanceRecord>;
+}
+
 export interface RecordFilterOptions {
   barangays: string[];
   assistanceTypes: string[];
@@ -199,6 +204,101 @@ export async function getRecord(id: number): Promise<AssistanceRecord> {
   if (error) throw new Error(databaseMessage(error.message));
   const row = data as SharedRecordRow;
   return normalizeRecord({ ...row.record, id: Number(row.id), recordLoadState: "full" });
+}
+
+export async function findExistingApplicantRecords(
+  surname: string,
+  firstName: string,
+  birthday = "",
+): Promise<AssistanceRecord[]> {
+  if (!isSupabaseConfigured) {
+    const records = await getLocalRecords();
+    return records.filter((record) =>
+      normalizeIdentityPart(record.surname) === normalizeIdentityPart(surname) &&
+      normalizeIdentityPart(record.firstName) === normalizeIdentityPart(firstName) &&
+      (!birthday || record.birthday === birthday),
+    );
+  }
+
+  let request = getSupabaseClient()
+    .from("assistance_record_index")
+    .select("record_id, summary_record")
+    .eq("surname_normalized", normalizeIdentityPart(surname))
+    .eq("first_name_normalized", normalizeIdentityPart(firstName))
+    .order("application_date", { ascending: false })
+    .limit(100);
+  if (birthday) request = request.eq("birthday", birthday);
+  const { data, error } = await request;
+  if (error) return compatibleTargetedFallback(error, (record) =>
+    normalizeIdentityPart(record.surname) === normalizeIdentityPart(surname) &&
+    normalizeIdentityPart(record.firstName) === normalizeIdentityPart(firstName) &&
+    (!birthday || record.birthday === birthday));
+  return indexedRowsToRecords(data);
+}
+
+export async function getApplicantContext(record: AssistanceRecord): Promise<AssistanceRecord[]> {
+  const history = await findExistingApplicantRecords(record.surname, record.firstName, record.birthday);
+  if (!isSupabaseConfigured) return householdCandidatesFromRecords(record, await getLocalRecords(), history);
+
+  const clues = householdSearchClues(record);
+  if (!clues.length) return dedupeRecords([record, ...history]);
+  const orFilter = clues.flatMap((clue) => [
+    `name_text.ilike.%${clue}%`,
+    `search_text.ilike.%${clue}%`,
+  ]).join(",");
+  const { data, error } = await getSupabaseClient()
+    .from("assistance_record_index")
+    .select("record_id, summary_record")
+    .or(orFilter)
+    .order("application_date", { ascending: false })
+    .limit(160);
+  if (error) return compatibleTargetedFallback(error, (candidate) => householdCandidate(record, candidate), history);
+  return dedupeRecords([record, ...history, ...indexedRowsToRecords(data)]);
+}
+
+export async function searchApplicantDirectory(query: string): Promise<AssistanceRecord[]> {
+  const normalized = normalizeIdentityPart(query);
+  if (normalized.length < 2) return [];
+  const tokens = normalized.split(/\s+/).filter((token) => token.length >= 2).slice(0, 6);
+  if (!isSupabaseConfigured) {
+    return (await getLocalRecords()).filter((record) => tokens.every((token) => directoryMatches(record, token))).slice(0, 80);
+  }
+  const orFilter = tokens.flatMap((token) => [
+    `name_text.ilike.%${token}%`,
+    `search_text.ilike.%${token}%`,
+  ]).join(",");
+  const { data, error } = await getSupabaseClient()
+    .from("assistance_record_index")
+    .select("record_id, summary_record")
+    .or(orFilter)
+    .order("application_date", { ascending: false })
+    .limit(80);
+  if (error) return compatibleTargetedFallback(error, (record) => tokens.every((token) => directoryMatches(record, token)));
+  return indexedRowsToRecords(data).filter((record) => tokens.every((token) => directoryMatches(record, token)));
+}
+
+export async function getDocumentMatchCandidates(rawText: string): Promise<AssistanceRecord[]> {
+  const tokens = Array.from(new Set(
+    normalizeIdentityPart(rawText).split(/\s+/).filter((token) => token.length >= 4 && !documentStopWords.has(token)),
+  )).slice(0, 16);
+  if (!tokens.length) return [];
+  if (!isSupabaseConfigured) {
+    const records = await getLocalRecords();
+    return records.filter((record) => tokens.some((token) => directoryMatches(record, token))).slice(0, 200);
+  }
+  const orFilter = tokens.flatMap((token) => [
+    `name_text.ilike.%${token}%`,
+    `search_text.ilike.%${token}%`,
+  ]).join(",");
+  const { data, error } = await getSupabaseClient()
+    .from("assistance_record_index")
+    .select("record_id, summary_record")
+    .eq("is_archived", false)
+    .or(orFilter)
+    .order("application_date", { ascending: false })
+    .limit(200);
+  if (error) return compatibleTargetedFallback(error, (record) => tokens.some((token) => directoryMatches(record, token)));
+  return indexedRowsToRecords(data);
 }
 
 export async function getCompleteRecords(): Promise<AssistanceRecord[]> {
@@ -384,3 +484,61 @@ function databaseMessage(message: string): string {
   }
   return message;
 }
+
+function indexedRowsToRecords(value: unknown): AssistanceRecord[] {
+  return ((value || []) as IndexedRecordRow[]).map((row) => normalizeRecord({
+    ...row.summary_record,
+    id: Number(row.record_id),
+    recordLoadState: "summary",
+  }));
+}
+
+async function compatibleTargetedFallback(
+  error: { message?: string },
+  predicate: (record: AssistanceRecord) => boolean,
+  seed: AssistanceRecord[] = [],
+): Promise<AssistanceRecord[]> {
+  console.warn("Focused database lookup is unavailable; using compatibility mode.", error);
+  return dedupeRecords([...seed, ...(await getRecords()).filter(predicate)]);
+}
+
+function dedupeRecords(records: AssistanceRecord[]): AssistanceRecord[] {
+  const unique = new Map<string, AssistanceRecord>();
+  records.forEach((record, index) => unique.set(record.id === undefined ? `new-${index}` : String(record.id), record));
+  return Array.from(unique.values());
+}
+
+function householdSearchClues(record: AssistanceRecord): string[] {
+  return Array.from(new Set([
+    normalizeIdentityPart(record.surname),
+    normalizeIdentityPart(record.middleName),
+    ...record.familyComposition.flatMap((member) => normalizeIdentityPart(member.fullName).split(/\s+/)),
+    ...record.confirmedRelativeKeys.flatMap((key) => key.split("|")),
+    ...record.relativeLinks.flatMap((link) => link.key.split("|")),
+  ].filter((value) => value.length >= 3))).slice(0, 12);
+}
+
+function householdCandidatesFromRecords(record: AssistanceRecord, records: AssistanceRecord[], history: AssistanceRecord[]): AssistanceRecord[] {
+  return dedupeRecords([record, ...history, ...records.filter((candidate) => householdCandidate(record, candidate))]);
+}
+
+function householdCandidate(record: AssistanceRecord, candidate: AssistanceRecord): boolean {
+  const clues = householdSearchClues(record);
+  const candidateText = normalizeIdentityPart([
+    candidate.surname, candidate.firstName, candidate.middleName, candidate.contact,
+    candidate.address, candidate.brgy, ...candidate.familyComposition.map((member) => member.fullName),
+  ].join(" "));
+  return clues.some((clue) => candidateText.includes(clue));
+}
+
+function directoryMatches(record: AssistanceRecord, query: string): boolean {
+  return normalizeIdentityPart([
+    record.surname, record.firstName, record.middleName, record.contact, record.idNumber,
+    record.birthday, record.address, record.brgy, record.legacyApplication?.idPresented || "",
+  ].join(" ")).includes(query);
+}
+
+const documentStopWords = new Set([
+  "republic", "philippines", "national", "identity", "card", "date", "birth",
+  "address", "surname", "given", "name", "male", "female", "filipino",
+]);
