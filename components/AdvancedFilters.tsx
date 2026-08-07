@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { AssistanceRecord } from "@/lib/types";
 import { conditionCategories } from "@/lib/conditionCategories";
 import { canonicalBarangay, canonicalCategory, canonicalLabel } from "@/lib/recordTaxonomy";
@@ -98,6 +99,20 @@ export default function AdvancedFilters({ filters, records, optionValues, matchi
   };
   const barangays = optionValues ? canonicalOptions(optionValues.barangays, canonicalBarangay) : uniqueValues("brgy", canonicalBarangay);
   const assistanceTypes = optionValues?.assistanceTypes || uniqueValues("assistanceType");
+
+  useEffect(() => {
+    if (!expanded) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setExpanded(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [expanded]);
 
   return (
     <section className="filters-section" aria-labelledby="advanced-filters-title">
@@ -201,8 +216,10 @@ export default function AdvancedFilters({ filters, records, optionValues, matchi
         </div>
       )}
 
-      {expanded && (
-        <div className="filter-drawer-backdrop" role="dialog" aria-modal="true" aria-labelledby="more-filters-title">
+      {expanded && typeof document !== "undefined" && createPortal(
+        <div className="filter-drawer-backdrop" role="dialog" aria-modal="true" aria-labelledby="more-filters-title" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setExpanded(false);
+        }}>
           <div className="advanced-filter-panel" id="advanced-filter-fields">
             <div className="filter-panel-heading">
               <div><span className="eyebrow">Records desk</span><h2 id="more-filters-title">More filters</h2><p>Use only the extra details needed for this search.</p></div>
@@ -248,7 +265,8 @@ export default function AdvancedFilters({ filters, records, optionValues, matchi
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </section>
   );
