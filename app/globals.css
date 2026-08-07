@@ -385,8 +385,21 @@ h1 { color: #063f24; font-size: clamp(1.25rem, 2vw, 1.65rem); line-height: 1.2; 
 .search-input:focus, input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px #0872391f; outline: none; }
 .table-container { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 .record-table-container { max-height: min(62vh, 720px); overflow: auto; scrollbar-gutter: stable; }
-.record-table-container table { min-width: 1400px; }
+.record-table-container table { min-width: 0; table-layout: fixed; }
 .record-table-container thead th { position: sticky; z-index: 3; top: 0; box-shadow: inset 0 -1px var(--border); }
+.record-selection-col { width: 44px; }
+.record-applicant-col { width: 26%; }
+.record-application-col { width: 20%; }
+.record-grant-col { width: 24%; }
+.record-payout-col { width: 112px; }
+.record-action-col { width: 176px; }
+.record-group-heading > span:first-child { display: block; margin-bottom: 5px; color: var(--text); }
+.record-group-sort-options { display: flex; flex-wrap: wrap; gap: 3px 9px; }
+.record-group-sort-options button { padding: 0; border: 0; background: transparent; color: #64748b; cursor: pointer; font: inherit; font-size: .66rem; font-weight: 700; white-space: nowrap; }
+.record-group-sort-options button:hover, .record-group-sort-options button.active { color: var(--primary); }
+.record-group-sort-options button span { color: #94a3b8; font-size: .58rem; }
+.record-group-sort-options button.active span { color: var(--primary); }
+.record-action-heading { text-align: center; }
 .table-sort-button { display: inline-flex; width: 100%; align-items: center; justify-content: space-between; gap: 7px; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; font-weight: inherit; text-align: left; }
 .table-sort-button:hover, .table-sort-button.active { color: var(--primary); }
 .table-sort-arrow { color: #94a3b8; font-size: .7rem; }
@@ -412,7 +425,22 @@ tr:hover { background: #f8fafc; }
 .payout-status small { font-size: .64rem; }
 .payout-status.completed { background: #dcfce7; color: #166534; }
 .payout-status.pending { background: #fef3c7; color: #92400e; }
+.record-table th, .record-table td { padding: 11px 12px; overflow-wrap: anywhere; }
+.record-applicant-cell > strong { display: block; margin-bottom: 7px; line-height: 1.25; }
+.record-cell-meta { display: flex; flex-wrap: wrap; gap: 3px 9px; color: var(--muted); font-size: .7rem; }
+.record-cell-meta span + span::before { margin-right: 7px; color: #94a3b8; content: "•"; }
+.record-application-date { display: grid; gap: 1px; color: var(--text); font-size: .8rem; }
+.record-application-date small { color: var(--muted); font-size: .61rem; font-weight: 800; letter-spacing: .035em; text-transform: uppercase; }
+.record-application-cell .assistance-type-cell { margin-top: 7px; }
+.record-grant-layout { display: grid; grid-template-columns: minmax(82px, .75fr) minmax(105px, 1.25fr); align-content: center; gap: 10px; }
+.record-grant-current { display: grid; align-content: start; gap: 2px; }
+.record-grant-current span, .history-summary > span:first-child { color: var(--muted); font-size: .61rem; font-weight: 800; letter-spacing: .035em; text-transform: uppercase; }
+.record-grant-current strong { color: var(--text); }
+.record-payout-cell { vertical-align: middle; }
 .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.record-actions-cell { vertical-align: middle; }
+.record-actions-cell .actions { align-content: center; justify-content: center; }
+.record-actions-cell .btn { flex: 1 1 70px; justify-content: center; white-space: nowrap; }
 .modal { position: fixed; inset: 0; z-index: 100; display: none; align-items: center; justify-content: center; padding: 20px; background: #0008; }
 .modal.active { display: flex; }
 .modal-content { width: 100%; max-width: 800px; max-height: 90vh; overflow-y: auto; padding: 24px; border-radius: var(--radius); background: var(--surface); }
@@ -667,6 +695,34 @@ textarea { resize: vertical; }
   .agency-filter-strip { grid-template-columns: minmax(145px, .7fr) minmax(0, 2fr); }
   .agency-match-mode { grid-column: 2; }
   .filter-group:first-child > div { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .record-table th, .record-table td { padding-inline: 9px; }
+  .record-applicant-col { width: 25%; }
+  .record-application-col { width: 19%; }
+  .record-grant-col { width: 25%; }
+  .record-action-col { width: 158px; }
+  .record-grant-layout { grid-template-columns: 1fr; gap: 7px; }
+  .record-grant-current { padding-bottom: 5px; border-bottom: 1px solid var(--border); }
+}
+
+@media (max-width: 900px) {
+  .record-table-container { max-height: none; overflow: visible; border: 0; background: transparent; scrollbar-gutter: auto; }
+  .record-table colgroup, .record-table thead { display: none; }
+  .record-table, .record-table tbody { display: block; width: 100%; }
+  .record-table tbody { display: grid; gap: 10px; }
+  .record-table tbody tr { position: relative; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(180px, .75fr); gap: 0 14px; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: white; box-shadow: 0 3px 12px #1733210a; }
+  .record-table tbody tr:hover { background: white; }
+  .record-table tbody tr.selected-record-row { background: #edf9f1; box-shadow: inset 4px 0 var(--primary); }
+  .record-table tbody td { display: grid; width: auto; padding: 11px 13px; border-bottom: 0; }
+  .record-table tbody .selection-column { position: absolute; z-index: 1; top: 12px; left: 11px; width: auto; padding: 0; }
+  .record-table tbody .selection-column + .record-applicant-cell { padding-left: 43px; }
+  .record-applicant-cell { grid-column: 1; border-bottom: 1px solid var(--border) !important; }
+  .record-application-cell { grid-column: 1; }
+  .record-grant-cell { grid-column: 2; grid-row: 1; border-bottom: 1px solid var(--border) !important; }
+  .record-payout-cell { grid-column: 2; grid-row: 2; align-content: center; }
+  .record-actions-cell { grid-column: 1 / -1; grid-row: 3; padding-top: 9px !important; border-top: 1px solid var(--border); background: #f8fafc; }
+  .record-actions-cell .actions { justify-content: flex-start; }
+  .record-actions-cell .btn { flex: 0 1 auto; min-width: 92px; }
+  .record-table .empty { grid-column: 1 / -1; }
 }
 
 @media (max-width: 768px) {
@@ -786,6 +842,14 @@ textarea { resize: vertical; }
   .record-list-controls { grid-template-columns: 1fr auto; }
   .record-results { grid-column: 1 / -1; }
   .record-pagination.compact { justify-content: flex-start; }
+  .record-table tbody tr { grid-template-columns: 1fr; }
+  .record-applicant-cell, .record-application-cell, .record-grant-cell, .record-payout-cell, .record-actions-cell { grid-column: 1; grid-row: auto; }
+  .record-grant-cell { border-top: 1px solid var(--border); }
+  .record-grant-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .record-grant-current { padding: 0; border: 0; }
+  .record-payout-cell { padding-top: 5px !important; }
+  .record-actions-cell .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .record-actions-cell .btn { width: 100%; }
   .dashboard-heading { align-items: stretch; flex-direction: column; }
   .dashboard-heading .btn { justify-content: center; }
   .chart-card-heading { align-items: flex-start; flex-direction: column; gap: 2px; }
