@@ -21,7 +21,7 @@ interface ImportResult {
   failed: number;
 }
 
-export default function DataTransfer({ records, onChanged }: { records: AssistanceRecord[]; onChanged: () => Promise<void> }) {
+export default function DataTransfer({ loadRecords, onChanged }: { loadRecords: () => Promise<AssistanceRecord[]>; onChanged: () => Promise<void> }) {
   const jsonInput = useRef<HTMLInputElement>(null);
   const csvInput = useRef<HTMLInputElement>(null);
   const excelInput = useRef<HTMLInputElement>(null);
@@ -31,6 +31,7 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
   const [overwrite, setOverwrite] = useState(false);
   const [importing, setImporting] = useState(false);
   const [exportingBackup, setExportingBackup] = useState(false);
+  const [preparingRecords, setPreparingRecords] = useState(false);
   const [progress, setProgress] = useState("");
   const [excelSummary, setExcelSummary] = useState<ExcelImportSummary | null>(null);
   const [previewFilter, setPreviewFilter] = useState<PreviewFilter>("all");
@@ -58,9 +59,19 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
     }
   };
 
-  const exportCsv = () => {
-    downloadFile(recordsToCsv(records), `assistance-records-${dateStamp()}.csv`, "text/csv;charset=utf-8");
-    setMessage({ type: "success", text: `Exported ${records.length} record${records.length === 1 ? "" : "s"} to CSV.` });
+  const exportCsv = async () => {
+    setPreparingRecords(true);
+    setMessage(null);
+    try {
+      const records = await loadRecords();
+      downloadFile(recordsToCsv(records), `assistance-records-${dateStamp()}.csv`, "text/csv;charset=utf-8");
+      setMessage({ type: "success", text: `Exported ${records.length} record${records.length === 1 ? "" : "s"} to CSV.` });
+    } catch (error) {
+      console.error(error);
+      setMessage({ type: "error", text: "The CSV export could not be prepared. Check the connection and try again." });
+    } finally {
+      setPreparingRecords(false);
+    }
   };
 
   const selectFile = async (event: ChangeEvent<HTMLInputElement>, selectedFormat: ImportFormat) => {
@@ -70,11 +81,13 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
     setMessage(null);
     setResult(null);
     setOverwrite(false);
+    setPreparingRecords(true);
     try {
       const parsedExcel = selectedFormat === "Excel" ? await parseMaipExcelImport(file) : null;
       const text = parsedExcel ? "" : await file.text();
       const rows = parsedExcel?.rows || (selectedFormat === "JSON" ? parseJsonImport(text) : parseCsvImport(text));
       if (!rows.length) throw new Error("The selected file contains no records.");
+      const records = await loadRecords();
       setFormat(selectedFormat);
       setFileName(file.name);
       setExcelSummary(parsedExcel?.summary || null);
@@ -85,6 +98,8 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
       setPreview(null);
       setExcelSummary(null);
       setMessage({ type: "error", text: error instanceof Error ? error.message : "The selected file could not be read." });
+    } finally {
+      setPreparingRecords(false);
     }
   };
 
@@ -167,16 +182,17 @@ export default function DataTransfer({ records, onChanged }: { records: Assistan
           <p>Export a backup or preview imported records before saving them to the {usesSharedDatabase ? "shared database" : "current browser"}.</p>
         </div>
         <div className="transfer-actions">
-          <button className="btn secondary" disabled={exportingBackup} onClick={() => void exportJson()}>{exportingBackup ? "Preparing Backup…" : "Export JSON"}</button>
-          <button className="btn secondary" onClick={() => jsonInput.current?.click()}>Import JSON</button>
-          <button className="btn secondary" onClick={exportCsv}>Export CSV</button>
-          <button className="btn secondary" onClick={() => csvInput.current?.click()}>Import CSV</button>
-          <button className="btn" onClick={() => excelInput.current?.click()}>Import MAIP Excel</button>
+          <button className="btn secondary" disabled={exportingBackup || preparingRecords} onClick={() => void exportJson()}>{exportingBackup ? "Preparing Backup…" : "Export JSON"}</button>
+          <button className="btn secondary" disabled={preparingRecords} onClick={() => jsonInput.current?.click()}>Import JSON</button>
+          <button className="btn secondary" disabled={preparingRecords} onClick={() => void exportCsv()}>{preparingRecords ? "Preparing…" : "Export CSV"}</button>
+          <button className="btn secondary" disabled={preparingRecords} onClick={() => csvInput.current?.click()}>Import CSV</button>
+          <button className="btn" disabled={preparingRecords} onClick={() => excelInput.current?.click()}>Import MAIP Excel</button>
           <input ref={jsonInput} className="sr-only" type="file" accept=".json,application/json" onChange={(event) => void selectFile(event, "JSON")} />
           <input ref={csvInput} className="sr-only" type="file" accept=".csv,text/csv" onChange={(event) => void selectFile(event, "CSV")} />
           <input ref={excelInput} className="sr-only" type="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" onChange={(event) => void selectFile(event, "Excel")} />
         </div>
       </section>
+      {preparingRecords && <div className="utility-loading-note" role="status"><span className="loading-spinner" aria-hidden="true" />Checking the shared application index only for this operation…</div>}
       {message && <div className={`notice ${message.type}`} role={message.type === "error" ? "alert" : "status"}>{message.text}</div>}
 
       {preview && counts && (

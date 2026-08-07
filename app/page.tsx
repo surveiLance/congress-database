@@ -48,7 +48,6 @@ export default function Home() {
 
 function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabase: boolean; staffEmail: string; testMode: boolean }) {
   const [records, setRecords] = useState<AssistanceRecord[]>([]);
-  const [supportRecords, setSupportRecords] = useState<AssistanceRecord[] | null>(null);
   const [recordTotal, setRecordTotal] = useState(0);
   const [activeCount, setActiveCount] = useState(0);
   const [archivedCount, setArchivedCount] = useState(0);
@@ -68,7 +67,6 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   const [recordPage, setRecordPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const recordTableRef = useRef<HTMLDivElement>(null);
-  const supportLoadPromise = useRef<Promise<AssistanceRecord[]> | null>(null);
 
   const refresh = useCallback(async () => {
     setRecordsLoading(true);
@@ -97,8 +95,6 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
   useEffect(() => {
     if (!sharedDatabase) return;
     return subscribeToRecordChanges(() => {
-      setSupportRecords(null);
-      supportLoadPromise.current = null;
       setReportRefreshKey((value) => value + 1);
       void refresh();
     });
@@ -135,24 +131,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
     [records, selectedIds],
   );
 
-  const ensureSupportRecords = useCallback(async () => {
-    if (supportRecords) return supportRecords;
-    if (supportLoadPromise.current) return supportLoadPromise.current;
-    const request = getRecords()
-      .then((savedRecords) => {
-        setSupportRecords(savedRecords);
-        return savedRecords;
-      })
-      .finally(() => {
-        supportLoadPromise.current = null;
-      });
-    supportLoadPromise.current = request;
-    return request;
-  }, [supportRecords]);
-
   const refreshAfterChange = useCallback(async () => {
-    setSupportRecords(null);
-    supportLoadPromise.current = null;
     setReportRefreshKey((value) => value + 1);
     await refresh();
   }, [refresh]);
@@ -341,12 +320,6 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
 
   const changeWorkspace = (nextWorkspace: Workspace) => {
     setWorkspace(nextWorkspace);
-    if (nextWorkspace === "utilities") {
-      void ensureSupportRecords().catch((reason) => {
-        console.error(reason);
-        setError("The complete application set could not be loaded for this tool.");
-      });
-    }
   };
 
   return (
@@ -474,8 +447,8 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
             </div>
             <RecordTable
               records={records}
-              allRecords={supportRecords || records}
-              completeContext={Boolean(supportRecords)}
+              allRecords={records}
+              completeContext={false}
               archived={showArchived}
               onView={openViewRecord}
               onEdit={showArchived ? undefined : openEditRecord}
@@ -520,7 +493,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
             <Dashboard query={query} filters={filters} refreshKey={reportRefreshKey} onView={openViewRecord} />
         </div>}
 
-        <div className="workspace-view" hidden={workspace !== "utilities"}>
+        {workspace === "utilities" && <div className="workspace-view">
             <section className="workspace-intro compact">
               <div>
                 <span className="eyebrow">Supervisor Tools</span>
@@ -529,14 +502,10 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
               </div>
             </section>
             <div className="utility-stack">
-              {supportRecords ? (
-                <>
-                  {sharedDatabase && <LocalRecordsMigration sharedRecords={supportRecords} onChanged={refreshAfterChange} />}
-                  <DataTransfer records={supportRecords} onChanged={refreshAfterChange} />
-                </>
-              ) : <WorkspaceLoading label="Preparing backup and import tools…" />}
+              {sharedDatabase && <LocalRecordsMigration loadSharedRecords={getRecords} onChanged={refreshAfterChange} />}
+              <DataTransfer loadRecords={getRecords} onChanged={refreshAfterChange} />
             </div>
-        </div>
+        </div>}
       </div>
 
       {formOpen && (
@@ -544,7 +513,7 @@ function AssistanceApp({ sharedDatabase, staffEmail, testMode }: { sharedDatabas
           key={editing?.id ?? "new-record"}
           open
           initialRecord={editing}
-          existingRecords={supportRecords || records}
+          existingRecords={records}
           onFindExistingApplicants={findExistingApplicantRecords}
           onFindHouseholdCandidates={getApplicantContext}
           onClose={() => { setFormOpen(false); setEditing(null); }}
